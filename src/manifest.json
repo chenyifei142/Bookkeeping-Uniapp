@@ -51,6 +51,7 @@
     /* 小程序特有相关 */
     "mp-weixin" : {
         "appid" : "",
+        "mergeVirtualHostAttributes" : true,
         "setting" : {
             "urlCheck" : false
         },
@@ -65,7 +66,7 @@
     "mp-toutiao" : {
         "usingComponents" : true
     },
-    "uniStatistics": {  
+    "uniStatistics": {
         "enable": false
     },
     "vueVersion" : "3"
