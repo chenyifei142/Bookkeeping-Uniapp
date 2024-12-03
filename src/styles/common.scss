@@ -115,6 +115,14 @@
   word-wrap: break-word;
 }
 
+.width-100 {
+  width: 100%;
+}
+
+.mgt-5 {
+  margin-top: 5px;
+}
+
 .mgt-20 {
   margin-top: 20px;
 }
@@ -133,5 +141,9 @@
 
 .gap-20 {
   gap: 20px;
+}
+
+.flex-1{
+  flex: 1;
 }
 
