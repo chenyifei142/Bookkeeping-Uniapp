@@ -14,7 +14,6 @@
         "navigationStyle": "custom",
         "navigationBarBackgroundColor": "#F2F2F2",
         "enablePullDownRefresh": false,
-        "disableScroll": true
       }
     },
     {
