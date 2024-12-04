@@ -99,6 +99,7 @@ onMounted(() => {
     </div>
     <card-bill v-for="item in 40"></card-bill>
   </div>
+  <div class="float-action-button icon-add-circle" v-if="!toggle"/>
 </template>
 
 <style scoped lang="scss">
