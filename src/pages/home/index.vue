@@ -103,42 +103,4 @@ onMounted(() => {
 </template>
 
 <style scoped lang="scss">
-.menu-button {
-  position: fixed;
-  top: 0;
-  z-index: 10;
-  padding-top: var(--pdt, 0);
-  width: 100%;
-  height: var(--height, 0);
-  display: flex;
-  justify-content: flex-start;
-  align-items: center;
-  padding-left: 12px;
-}
-
-.toggle-on {
-  background: #1F2025;
-  color: #ffffff;
-}
-
-.toggle-off {
-  color: white;
-}
-
-.home-page {
-  min-height: 100vh;
-  background: #1C2025;
-  padding: 15px 12px env(safe-area-inset-bottom) 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-
-  .home-banner {
-    margin-top: var(--mgt, 0);
-    width: 100%;
-    border-radius: 8px;
-    z-index: 1;
-  }
-}
-
 </style>
