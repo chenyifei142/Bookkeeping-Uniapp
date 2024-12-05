@@ -63,7 +63,7 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="menu-button menu-toggle" :class="toggle ? 'toggle-on' : 'toggle-off'"
+  <div class="menu-button menu-toggle" style="padding-left: 12px;" :class="toggle ? 'toggle-on' : 'toggle-off'"
        :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height}px;`">
     <div class="flex-align-start">
       <div class="flex-start">
