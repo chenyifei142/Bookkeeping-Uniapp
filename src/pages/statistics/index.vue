@@ -14,7 +14,8 @@ const toggle = ref(false)
 onPageScroll(_.debounce((options: any) => toggle.value = options.scrollTop > 20, 0))
 
 const menuBtnRect = ref<menuBtnRectType>({top: 0, height: 0})
-const selectBoxHeight = ref<number>(0);  // 使用 number 来存储总高度
+const selectItemHeight = ref<number>(0);  // 使用 number 来存储总高度
+const selectTimeHeight = ref<number>(0);  // 使用 number 来存储总高度
 onBeforeMount(async () => {
   menuBtnRect.value = uni.getMenuButtonBoundingClientRect()
 })
@@ -72,18 +73,18 @@ onMounted(() => {
   const query = uni.createSelectorQuery();
 
   query.select('.select-box').boundingClientRect((data: any) => {
-    selectBoxHeight.value += data.height;  // 累加选择框的高度
+    selectItemHeight.value += data.height;
   }).exec();
 
   query.select('.select-time').boundingClientRect((data: any) => {
-    selectBoxHeight.value += data.height;  // 累加时间框的高度
+    selectTimeHeight.value += data.height;
   }).exec();
 })
 </script>
 
 <template>
   <div class="menu-button menu-toggle" :class="toggle ? 'toggle-on' : 'toggle-off'"
-       :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height + selectBoxHeight}px;`">
+       :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height  + selectTimeHeight}px;`">
     <div class="flex-align-start gap-10">
       <div class="flex-center width-100">
         统计
@@ -109,7 +110,8 @@ onMounted(() => {
     </div>
   </div>
   <div class="home-page">
-    <div class="home-banner" :style="`--mgt: ${menuBtnRect.height + menuBtnRect.top + selectBoxHeight}px`">
+    <div class="home-banner"
+         :style="`--mgt: ${menuBtnRect.height + menuBtnRect.top +selectItemHeight+ selectTimeHeight}px`">
       <div class="box">
         <div></div>
         <div></div>
