@@ -5,6 +5,10 @@ import _ from "lodash";
 import QiunDataCharts from "@/components/qiun-data-charts/qiun-data-charts.vue";
 import CardBase from "@/components/card/card-base.vue";
 import CardBill from "@/components/card/card-bill.vue";
+import CardTab from "@/components/card/card-tab.vue";
+import LineCharts from "@/components/charts/line-charts.vue";
+import RingCharts from "@/components/charts/ring-charts.vue";
+import ExpenseTabs from "@/pages/statistics/components/ExpenseTabs.vue";
 
 type menuBtnRectType = {
   top: number;
@@ -112,12 +116,10 @@ onMounted(() => {
   <div class="home-page">
     <div class="home-banner"
          :style="`--mgt: ${menuBtnRect.height + menuBtnRect.top +selectItemHeight+ selectTimeHeight}px`">
-      <div class="box">
-        <div></div>
-        <div></div>
-        <div></div>
-      </div>
+      <ExpenseTabs></ExpenseTabs>
     </div>
+    <line-charts></line-charts>
+    <ring-charts></ring-charts>
   </div>
 </template>
 
@@ -135,13 +137,4 @@ onMounted(() => {
   background-color: #0ACB79;
 }
 
-.box {
-  position: relative;
-  box-sizing: border-box;
-  padding: 15px;
-  background-color: #24282E;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 0 50px 0 rgba(0, 0, 0, 1);
-}
 </style>
