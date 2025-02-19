@@ -3,13 +3,27 @@
   "compilerOptions": {
     "sourceMap": true,
     "baseUrl": ".",
+    "outDir": "./dist",
+    "allowJs": true,  //编译时允许有js
+    "allowSyntheticDefaultImports": true,  //允许引入没有默认导出的模块
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     },
-    "lib": ["esnext", "dom"],
-    "types": ["@dcloudio/types"],
-    "noImplicitAny": false,
-    "allowJs": true
+    "lib": [
+      "esnext",
+      "dom"
+    ],
+    "types": [
+      "@dcloudio/types"
+    ]
   },
-  "include": ["src/**/*.ts", "src/**/*.d.ts", "src/**/*.tsx", "src/**/*.vue"]
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.js",//添加路径支持js
+    "src/**/*.d.ts",
+    "src/**/*.tsx",
+    "src/**/*.vue"
+  ]
 }
