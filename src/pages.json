@@ -13,7 +13,15 @@
       "style": {
         "navigationStyle": "custom",
         "navigationBarBackgroundColor": "#F2F2F2",
-        "enablePullDownRefresh": false,
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/home/components/addBillRecord",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarBackgroundColor": "#F2F2F2",
+        "enablePullDownRefresh": false
       }
     },
     {

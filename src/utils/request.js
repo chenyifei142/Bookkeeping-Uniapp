@@ -2,7 +2,7 @@
 import {getToken} from './auth'
 import {jumpPage, redirectPage, showToast} from '@/utils/index'
 
-export const baseUrl = 'https://45nq40838hb5.vicp.fun/bookkeeping'
+export const baseUrl = 'http://q89vhq.natappfree.cc/bookkeeping'
 // export const baseUrl = 'http://192.168.1.40:8006'
 
 const request = (options = {}) => {
@@ -18,7 +18,6 @@ const request = (options = {}) => {
     }
 
     return new Promise(async (resolve, reject) => {
-        // await uni.showLoading({mask: true})
         uni.request({
             url: baseUrl + options.url || '',
             method: options.type || 'GET',
@@ -47,7 +46,7 @@ const request = (options = {}) => {
 
 const get = (url, data = null, options = {}) => {
     options.type = 'GET'
-    options.data = JSON.stringify(data)
+    options.data = data
     options.url = url
     return request(options)
 }
