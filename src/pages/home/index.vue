@@ -167,7 +167,7 @@ onMounted(() => {
 <template>
   <default-home-page>
     <template #title>
-      <div class="flex-align-start">
+      <div class="flex-align-start" style="padding-left: 12px;">
         <div class="flex-start">
           <span class="font-lg">泽狗呀</span>
         </div>
@@ -199,11 +199,7 @@ onMounted(() => {
     </template>
     <template #content>
       <div class="bill-list">
-        <card-bill
-            v-for="(item, index) in billList"
-            :key="index"
-            :bill-data="item"
-        ></card-bill>
+        <card-bill v-for="(item, index) in billList" :key="index" :bill-data="item"></card-bill>
         <div class="loading-text" v-if="loading">加载中...</div>
         <div class="no-more" v-if="!hasMore && billList.length > 0">没有更多数据了</div>
         <div class="empty" v-if="!loading && billList.length === 0">暂无记账数据</div>

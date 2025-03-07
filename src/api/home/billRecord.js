@@ -10,3 +10,4 @@ export async function getTotalExpenseMonthly(month) {
     return (await request.get('/statistics/totalExpenseMonthly', { month }))
 }
 
+
