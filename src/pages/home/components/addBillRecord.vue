@@ -96,6 +96,11 @@ const handleTouchEnd = (e) => {
 }
 
 const handleNumberClick = (num) => {
+  uni.vibrateShort({
+    success: function () {
+      console.log('success');
+    }
+  });
   if (amount.value === '0' && num !== '.') {
     amount.value = num
   } else {
@@ -461,7 +466,8 @@ input:checked + .slider:before {
 /* 数字键盘 */
 .keypad {
   margin-top: auto;
-  padding: 15px 0 env(safe-area-inset-bottom) 0;
+  padding-bottom:calc(16rpx + constant(safe-area-inset-bottom));
+  padding-bottom:calc(16rpx + env(safe-area-inset-bottom));
 }
 
 .keypad-grid {
