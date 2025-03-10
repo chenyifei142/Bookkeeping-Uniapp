@@ -149,7 +149,7 @@ const getMonthlyExpense = async () => {
     const res = await getTotalExpenseMonthly(currentMonth.value)
     if (res.code === 0) {
       monthlyExpense.value = res?.data?.total || 0
-      monthlyBudget.value = res?.data?.budget || 0
+      monthlyBudget.value = res?.data?.balance || 0
       // 计算日均可消费
       calculateDailyAvailable()
     }
@@ -206,11 +206,15 @@ onMounted(() => {
       </div>
     </template>
   </default-home-page>
-  <div class="float-action-button icon-add-circle" @click="jumpPage('pages/home/components/addBillRecord')" v-if="!toggle"/>
+  <div class="float-action-button icon-add-circle" @click="jumpPage('pages/home/components/addBillRecord')"
+       v-if="!toggle"/>
 </template>
 
 <style scoped lang="scss">
 .bill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 
   .loading-text {
     text-align: center;

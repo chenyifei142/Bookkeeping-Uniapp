@@ -32,7 +32,7 @@ defineProps<{
       <div class="font-xs">支出：{{ billData.total }}</div>
     </div>
     <div class="width-100" style="border-bottom: rgba(10, 203, 121, .5) solid 1px"></div>
-    <div class="flex-align-start gap-10 width-100">
+    <div class="flex-align-start  width-100">
       <div class="card-item flx-justify-between width-100" v-for="item in billData.Data" :key="item.ID">
         <div class="flex-start gap-10 color-E5E">
           <up-icon name="red-packet" color="#fff" size="30"></up-icon>
