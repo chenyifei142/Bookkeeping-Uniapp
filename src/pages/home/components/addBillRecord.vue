@@ -40,7 +40,7 @@ const formattedDate = computed(() => {
 })
 
 // ====================== 分类相关状态与方法 ======================
-const selectedCategory = ref('餐饮日常')
+const selectedCategory = ref<any>({ID: '', name: '', icon: ''})
 const excludeFromAccount = ref(false)
 const allCategories = ref<billType[]>([])
 
@@ -58,6 +58,7 @@ const categoryPages = computed(() => {
     const page = allCategories.value.slice(i, i + 10)
     pages.push(page)
   }
+  selectedCategory.value = pages[0][0]
   return pages
 })
 
@@ -111,7 +112,7 @@ const updateDisplayExpression = () => {
  * @param num 需要格式化的数字
  * @returns 格式化后的数字字符串
  */
-const formatNumber = (num) => {
+const formatNumber = (num: any) => {
   // 转换为字符串并最多保留两位小数
   let str = parseFloat(num.toFixed(2)).toString();
 
@@ -160,7 +161,7 @@ const calculateResult = () => {
  * 处理数字点击
  * @param num 点击的数字或小数点
  */
-const handleNumberClick = (num) => {
+const handleNumberClick = (num: any) => {
   uni.vibrateShort({
     success: function () {
       console.log('success');
@@ -309,7 +310,7 @@ const handleComplete = async () => {
     consumptionTime: "2025-03-10 15:02:53",
     consumptionDate: "2025-03-10 15:02:53",
   })
-  console.log(data,"data")
+  console.log(data, "data")
   // 重置状态
   amount.value = '0';
   currentOperation.value = '';
@@ -345,7 +346,7 @@ const handleRecordAgain = () => {
  * 触摸开始事件处理
  * @param e 触摸事件对象
  */
-const handleTouchStart = (e) => {
+const handleTouchStart = (e: any) => {
   touchStartX.value = e.touches[0].clientX
 }
 
@@ -353,7 +354,7 @@ const handleTouchStart = (e) => {
  * 触摸移动事件处理
  * @param e 触摸事件对象
  */
-const handleTouchMove = (e) => {
+const handleTouchMove = (e: any) => {
   // 可以添加一些视觉反馈，如果需要的话
 }
 
@@ -362,7 +363,7 @@ const handleTouchMove = (e) => {
  * 实现左右滑动切换分类页面
  * @param e 触摸事件对象
  */
-const handleTouchEnd = (e) => {
+const handleTouchEnd = (e: any) => {
   const touchEndX = e.changedTouches[0].clientX
   const diffX = touchEndX - touchStartX.value
 
@@ -405,7 +406,7 @@ onMounted(() => {
         <div class="flx-justify-between width-100">
           <div class="flex-start gap-10 color-E5E">
             <up-icon name="red-packet" color="#fff" size="40"></up-icon>
-            <div class="font-sm">{{ selectedCategory }}</div>
+            <div class="font-sm">{{ selectedCategory.name }}</div>
           </div>
           <div class="color-0AC font-xl font-bold">{{ displayAmount }}</div>
         </div>
@@ -433,8 +434,8 @@ onMounted(() => {
             <div
                 v-for="category in page.slice(0, Math.min(5, page.length))"
                 :key="category.ID"
-                @click="selectedCategory = category.ID"
-                :class="['category-item', selectedCategory === category.ID ? 'active' : '']"
+                @click="selectedCategory = category"
+                :class="['category-item', selectedCategory.ID === category.ID ? 'active' : '']"
             >
               <div class="icon-wrapper">
                 <up-icon name="red-packet" color="#fff" size="30"></up-icon>
@@ -448,8 +449,8 @@ onMounted(() => {
             <div
                 v-for="category in page.slice(5)"
                 :key="category.ID"
-                @click="selectedCategory = category.ID"
-                :class="['category-item', selectedCategory === category.ID ? 'active' : '']"
+                @click="selectedCategory = category"
+                :class="['category-item', selectedCategory.ID === category.ID ? 'active' : '']"
             >
               <div class="icon-wrapper">
                 <up-icon name="red-packet" color="#fff" size="30"></up-icon>

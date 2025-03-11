@@ -2,7 +2,7 @@
 import {getToken} from './auth'
 import {jumpPage, redirectPage, showToast} from '@/utils/index'
 
-export const baseUrl = 'http://a8tkg4.natappfree.cc/bookkeeping'
+export const baseUrl = 'http://xc53ae.natappfree.cc/bookkeeping'
 // export const baseUrl = 'http://192.168.1.40:8006'
 
 const request = (options = {}) => {
