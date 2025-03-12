@@ -4,6 +4,7 @@ import {onPageScroll} from "@dcloudio/uni-app";
 import _ from "lodash";
 import {login} from '@/api/login'
 import {jumpPage, showToast} from "@/utils";
+import BasicLayout from "@/components/layout/basic-layout.vue";
 
 type menuBtnRectType = {
   top: number;
@@ -66,41 +67,43 @@ const handleLogin = async () => {
 </script>
 
 <template>
-  <div class="menu-button menu-toggle" style="padding-left: 12px;" :class="toggle ? 'toggle-on' : 'toggle-off'"
-       :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height}px;`">
-    <div class="flex-center">
-      <span class="font-lg">登录</span>
-    </div>
-  </div>
-  <div class="home-page">
-    <div class="home-banner" :style="`--mgt: ${menuBtnRect.height + menuBtnRect.top}px`"></div>
-    <div class="login-form">
-      <div class="form-container">
-        <div class="form-item">
-          <input
-              type="text"
-              v-model="loginForm.username"
-              placeholder="请输入用户名"
-              class="input-field"
-              :class="{'error': errors.username}"
-          />
-          <div class="error-message" v-if="errors.username">{{ errors.username }}</div>
-        </div>
-        <div class="form-item">
-          <input
-              type="password"
-              v-model="loginForm.password"
-              placeholder="请输入密码"
-              class="input-field"
-              :class="{'error': errors.password}"
-          />
-          <div class="error-message" v-if="errors.password">{{ errors.password }}</div>
-        </div>
-        <button class="login-btn" @click="handleLogin">登录</button>
-      </div>
-    </div>
-    123
-  </div>
+ <basic-layout>
+   <div class="menu-button menu-toggle" style="padding-left: 12px;" :class="toggle ? 'toggle-on' : 'toggle-off'"
+        :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height}px;`">
+     <div class="flex-center">
+       <span class="font-lg">登录</span>
+     </div>
+   </div>
+   <div class="home-page">
+     <div class="home-banner" :style="`--mgt: ${menuBtnRect.height + menuBtnRect.top}px`"></div>
+     <div class="login-form">
+       <div class="form-container">
+         <div class="form-item">
+           <input
+               type="text"
+               v-model="loginForm.username"
+               placeholder="请输入用户名"
+               class="input-field"
+               :class="{'error': errors.username}"
+           />
+           <div class="error-message" v-if="errors.username">{{ errors.username }}</div>
+         </div>
+         <div class="form-item">
+           <input
+               type="password"
+               v-model="loginForm.password"
+               placeholder="请输入密码"
+               class="input-field"
+               :class="{'error': errors.password}"
+           />
+           <div class="error-message" v-if="errors.password">{{ errors.password }}</div>
+         </div>
+         <button class="login-btn" @click="handleLogin">登录</button>
+       </div>
+     </div>
+     123
+   </div>
+ </basic-layout>
 </template>
 
 <style scoped lang="scss">

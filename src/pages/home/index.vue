@@ -7,7 +7,8 @@ import CardBase from "@/components/card/card-base.vue";
 import CardBill from "@/components/card/card-bill.vue";
 import {getBillRecordList, getTotalExpenseMonthly} from '@/api/home/billRecord'
 import DefaultHomePage from "@/components/defaultPage/defaultHomePage.vue";
-import {jumpPage} from "@/utils";
+import {backPage, jumpPage} from "@/utils";
+import BasicLayout from "@/components/layout/basic-layout.vue";
 
 type menuBtnRectType = {
   top: number;
@@ -46,8 +47,31 @@ const opts = ref({
   }
 })
 
+// 定义交易记录相关接口
+interface BillType {
+  ID: number;
+  name: string;
+  icon: string;
+}
+
+interface BillItem {
+  ID: number;
+  price: string | number;
+  consumptionTime: string;
+  remark?: string;
+  type: string;
+  iconBg: string;
+  BillType: BillType;
+}
+
+interface BillGroup {
+  consumptionDate: string;
+  total: number;
+  Data: BillItem[];
+}
+
 // 账单列表数据
-const billList = ref([])
+const billList = ref<BillGroup[]>([])
 const currentDayTotal = ref(0)
 const pageParams = reactive({
   pageNo: 1,
@@ -158,6 +182,44 @@ const getMonthlyExpense = async () => {
   }
 }
 
+// 格式化日期显示
+const formatDateDisplay = (dateStr: string) => {
+  if (!dateStr) return '';
+
+  // 解析日期字符串为日期对象
+  const consumptionDate = new Date(dateStr);
+  // 获取当前日期（不含时分秒）
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  // 计算日期差异（天数）
+  const timeDiff = Math.floor((consumptionDate.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+
+  // 获取月份和日期
+  const month = consumptionDate.getMonth() + 1;
+  const day = consumptionDate.getDate();
+  const datePrefix = `${month}月${day}日`;
+
+  // 根据与今天的差异返回不同的文本
+  switch (timeDiff) {
+    case -2:
+      return `${datePrefix} 前天`;
+    case -1:
+      return `${datePrefix} 昨天`;
+    case 0:
+      return `${datePrefix} 今天`;
+    case 1:
+      return `${datePrefix} 明天`;
+    case 2:
+      return `${datePrefix} 后天`;
+    default:
+      // 获取星期几
+      const weekdays = ['日', '一', '二', '三', '四', '五', '六'];
+      const weekday = weekdays[consumptionDate.getDay()];
+      return `${datePrefix} 周${weekday}`;
+  }
+}
+
 onMounted(() => {
   getBillRecords()
   getMonthlyExpense()
@@ -165,73 +227,237 @@ onMounted(() => {
 </script>
 
 <template>
-  <default-home-page>
-    <template #title>
-      <div class="flex-align-start" style="padding-left: 12px;">
-        <div class="flex-start">
-          <span class="font-lg">泽狗呀</span>
-        </div>
-      </div>
-    </template>
-    <template #banner>
-      <card-base>
-        <div class="flx-justify-between width-100 color-E5E">
-          <div class="font-xs">{{ currentMonth }}</div>
-          <div class="font-xs">
-            <up-icon name="setting" color="#fff"></up-icon>
+  <basic-layout>
+    <default-home-page :is-other-high="15">
+      <template #title>
+        <div class="flex-center">
+          <div class="calendar-icon" style="position: absolute;left: 10px" @click="backPage()">
+            <u-icon name="calendar" size="25" bold color="#5E5D5B"></u-icon>
+          </div>
+          <div class="flex-align-center gap-5">
+            <div class="font-bold font-xl color-000">3月</div>
+            <div class="color-666 font-xs">3月1日 - 3月31日</div>
           </div>
         </div>
-        <div class="width-100" style="border-bottom: rgba(255,255,255,.3) solid 1px"></div>
-        <div class="flx-justify-between width-100" style="height: 150px">
-          <div class="flx-align-center">
-            <div class="color-0AC font-sm">{{ monthlyExpense }}</div>
-            <div class="color-E5E font-xs">本月已消费</div>
+      </template>
+      <template #banner>
+        <!-- 收支统计 -->
+        <div class="summary-cards card-container">
+          <div class="summary-card expense">
+            <div class="card-header">
+              <div class="card-icon">
+                <span class="emoji">💸</span>
+              </div>
+              <div class="card-title">支出</div>
+            </div>
+            <div class="card-amount">¥{{ monthlyExpense }}</div>
           </div>
-          <div style="width: 60%;height: 100%">
-            <qiun-data-charts type="arcbar" :opts="opts" :chartData="chartData"/>
-          </div>
-          <div class="flx-align-center">
-            <div class="color-0AC font-sm">{{ monthlyBudget }}</div>
-            <div class="color-E5E font-xs">剩余预算</div>
+          <div class="summary-card income">
+            <div class="card-header">
+              <div class="card-icon">
+                <span class="emoji">💰</span>
+              </div>
+              <div class="card-title">收入</div>
+            </div>
+            <div class="card-amount">0</div>
           </div>
         </div>
-      </card-base>
-    </template>
-    <template #content>
-      <div class="bill-list">
-        <card-bill v-for="(item, index) in billList" :key="index" :bill-data="item"></card-bill>
-        <div class="loading-text" v-if="loading">加载中...</div>
-        <div class="no-more" v-if="!hasMore && billList.length > 0">没有更多数据了</div>
-        <div class="empty" v-if="!loading && billList.length === 0">暂无记账数据</div>
-      </div>
-    </template>
-  </default-home-page>
-  <div class="float-action-button icon-add-circle" @click="jumpPage('pages/home/components/addBillRecord')"
-       v-if="!toggle"/>
+      </template>
+      <template #content>
+        <!-- 交易记录列表 -->
+        <div class="transactions ">
+          <div v-for="(group, index) in billList" :key="index" class="transaction-group">
+            <div class="date-header">
+              <div class="date">{{ formatDateDisplay(group.consumptionDate) }}</div>
+              <div class="daily-summary">
+                <div class="unit">支</div>
+                <span class="num">¥{{ group.total }}</span>
+              </div>
+            </div>
+            <div class="transaction-items">
+              <div v-for="(item, itemIndex) in group.Data" :key="item.ID" class="transaction-item">
+                <div class="item-left">
+                  <div class="item-icon" :style="{ backgroundColor: item.iconBg }">
+                    <span class="emoji">{{ item.BillType.icon }}</span>
+                  </div>
+                  <div class="item-info">
+                    <div class="item-category">{{ item.BillType.name }}</div>
+                    <div class="item-time">{{ item.remark || item.consumptionTime.substring(10, 16) }}</div>
+                  </div>
+                </div>
+                <div class="item-amount font-bold" :class="{ 'expense': item.type === 'expense' }">
+                  -￥{{ item.price }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </default-home-page>
+  </basic-layout>
+  <div class="float-action-button icon-add-circle flex-center gap-10"
+       @click="jumpPage('pages/home/components/addBillRecord')"
+       v-if="!toggle">
+    <img class="add-icon" src="@/static/add.png" alt="">
+    <span class="color-183">记一笔</span>
+  </div>
 </template>
 
-<style scoped lang="scss">
-.bill-list {
+<style scoped>
+.calendar-icon {
+  width: 40px;
+  height: 40px;
+  background-color: #f0f0f0;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 收支统计卡片样式 */
+.summary-cards {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.summary-card {
+  flex: 1;
+  background-color: rgba(244, 244, 244, .9);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.card-icon {
+  font-size: 20px;
+}
+
+.card-title {
+  font-size: 16px;
+  color: #666;
+  font-weight: 500;
+}
+
+.card-amount {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* 交易记录列表样式 */
+.transactions {
+  margin-top: 16px;
+}
+
+.transaction-group {
+  margin-bottom: 16px;
+}
+
+.date-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 8px;
+  font-size: 14px;
+  color: #908F8D;
+  font-weight: 500;
+}
+
+.daily-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.daily-summary .unit {
+  background-color: rgba(244, 244, 244, .9);
+  padding: 2px 3px;
+  color: #474644;
+  font-size: 12px;
+  border-radius: 5px;
+}
+
+.daily-summary .num {
+  font-weight: 600;
+  color: #4A4947;
+}
+
+.transaction-items {
+  background-color: rgba(244, 244, 244, .9);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.transaction-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 3px solid #FFFFFF;
+}
+
+.transaction-item:last-child {
+  border-bottom: none;
+}
+
+.item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.item-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 20px;
+}
+
+.item-info {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+}
 
-  .loading-text {
-    text-align: center;
-    color: #999;
-    padding: 16px 0;
-  }
+.item-category {
+  color: #000000;
+  font-size: 16px;
+  font-weight: 500;
+}
 
-  .no-more {
-    text-align: center;
-    color: #999;
-    padding: 16px 0;
-  }
+.item-time {
+  font-size: 14px;
+  color: #999;
+  margin-top: 4px;
+}
 
-  .empty {
-    text-align: center;
-    color: #999;
-    padding: 32px 0;
-  }
+.item-amount {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.item-amount.expense {
+  color: #000;
+}
+
+.nav-item span {
+  font-size: 12px;
+}
+
+.emoji {
+  font-style: normal;
+}
+
+.add-icon {
+  width: 20px;
+  height: 20px;
+  background-size: 100%;
 }
 </style>

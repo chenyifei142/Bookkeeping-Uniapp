@@ -9,6 +9,7 @@ import CardTab from "@/components/card/card-tab.vue";
 import LineCharts from "@/components/charts/line-charts.vue";
 import RingCharts from "@/components/charts/ring-charts.vue";
 import ExpenseTabs from "@/pages/statistics/components/ExpenseTabs.vue";
+import BasicLayout from "@/components/layout/basic-layout.vue";
 
 type menuBtnRectType = {
   top: number;
@@ -87,6 +88,7 @@ onMounted(() => {
 </script>
 
 <template>
+<basic-layout>
   <div class="menu-button menu-toggle" :class="toggle ? 'toggle-on' : 'toggle-off'"
        :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height  + selectTimeHeight}px;`">
     <div class="flex-align-start gap-10">
@@ -121,6 +123,7 @@ onMounted(() => {
     <line-charts></line-charts>
     <ring-charts></ring-charts>
   </div>
+</basic-layout>
 </template>
 
 <style scoped lang="scss">
