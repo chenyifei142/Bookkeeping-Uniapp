@@ -36,7 +36,7 @@ watch(() => props.pageIndex, (newVal) => {
 const tabs = [
   {
     pagePath: "pages/home/index",
-    text: "首页",
+    text: "明细",
     iconPath: "/static/tabBar/tally.png",
     selectedIconPath: "/static/tabBar/tally-active.png"
   },
@@ -57,10 +57,40 @@ const tabs = [
 // 切换标签页
 const switchTab = (url: string, index: number) => {
   if (currentIndex.value === index) return
+  
+  // 检查页面是否存在，防止跳转到不存在的页面
+  const validPages = [
+    'pages/home/index',
+    'pages/statistics/index',
+    'pages/my/index'
+  ]
+  
+  if (!validPages.includes(url)) {
+    console.error(`页面不存在: ${url}`)
+    uni.showToast({
+      title: '该功能暂未开放',
+      icon: 'none'
+    })
+    return
+  }
+  
   currentIndex.value = index
-  uni.switchTab({
-    url: `/${url}`
-  })
+  
+  // 使用try-catch捕获可能的错误
+  try {
+    uni.switchTab({
+      url: `/${url}`,
+      fail: (err) => {
+        console.error('页面跳转失败:', err)
+        uni.showToast({
+          title: '页面跳转失败',
+          icon: 'none'
+        })
+      }
+    })
+  } catch (error) {
+    console.error('switchTab执行错误:', error)
+  }
 }
 </script>
 

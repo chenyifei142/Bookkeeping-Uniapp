@@ -16,7 +16,7 @@ export const backPage = () => {
     } else {
         // 没有上一级页面，跳转到指定的tab页
         uni.reLaunch({
-            url: '/pages/my/my'
+            url: '/pages/my/index'
         });
     }
 }
