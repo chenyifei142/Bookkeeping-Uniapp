@@ -14,9 +14,15 @@ export async function getTotalExpenseMonthly(month) {
 export async function getBillTypeList(data) {
     return (await request.get('/billType/list', data))
 }
+
 // 添加记录
 export async function saveBillRecord(data) {
     return (await request.post('/billRecord/save', data))
+}
+
+// 每年有记录的月份
+export async function getCurrentYearRecord(data) {
+    return (await request.get('/statistics/currentYearRecord', data))
 }
 
 

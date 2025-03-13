@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import {ref, computed, watch} from 'vue';
+import {getCurrentYearRecord} from "@/api/home/billRecord";
 
 // 定义组件的props
 const props = defineProps({
@@ -23,19 +24,38 @@ const emit = defineEmits(['update:show', 'select-month']);
 // 月份列表
 const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
 const currentYear = new Date().getFullYear();
+const currentMonth = new Date().getMonth() + 1;
+
+// 临时年份状态，用于滑动切换
+const tempYear = ref(props.selectedYear);
+const tempMonth = ref(props.selectedMonth);
+// 滑动方向状态
+const slideDirection = ref(''); // 'left' 或 'right'
+const isAnimating = ref(false);
+
+// 监听弹窗显示状态
+watch(() => props.show, (newVal) => {
+  if (newVal) {
+    getData()
+    // 弹窗打开时，初始化临时状态为当前选中的年月
+    tempYear.value = props.selectedYear;
+    tempMonth.value = props.selectedMonth;
+    // 重置滑动方向
+    slideDirection.value = '';
+  }
+});
 
 // 关闭弹窗
 const closePopup = () => {
+  // 重置临时状态
+  tempYear.value = props.selectedYear;
+  tempMonth.value = props.selectedMonth;
   emit('update:show', false);
 };
 
 // 选择月份
 const selectMonth = (year: number, month: number) => {
   // 检查是否超过当前时间
-  const currentDate = new Date();
-  const currentYear = currentDate.getFullYear();
-  const currentMonth = currentDate.getMonth() + 1;
-
   if (year > currentYear || (year === currentYear && month > currentMonth)) {
     uni.showToast({
       title: '不能选择未来的月份',
@@ -44,9 +64,12 @@ const selectMonth = (year: number, month: number) => {
     return;
   }
 
+  // 更新临时状态
+  tempMonth.value = month;
+
   // 触发选择事件
-  emit('select-month', { year, month });
-  
+  emit('select-month', {year, month});
+
   // 关闭弹窗
   closePopup();
 };
@@ -68,43 +91,55 @@ const handleTouchEnd = (e: TouchEvent) => {
 
   // 如果滑动距离足够大，则切换年份
   if (Math.abs(diffX) > 50) {
-    let newYear = props.selectedYear;
+    // 设置动画状态
+    isAnimating.value = true;
     
     if (diffX > 0) {
       // 右滑，切换到上一年
-      newYear -= 1;
+      slideDirection.value = 'right';
+      setTimeout(() => {
+        tempYear.value -= 1;
+        // 动画结束后重置状态
+        setTimeout(() => {
+          isAnimating.value = false;
+        }, 300);
+      }, 50);
     } else {
       // 左滑，切换到下一年
-      if (props.selectedYear < currentYear) {
-        newYear += 1;
+      if (tempYear.value < currentYear) {
+        slideDirection.value = 'left';
+        setTimeout(() => {
+          tempYear.value += 1;
+          // 动画结束后重置状态
+          setTimeout(() => {
+            isAnimating.value = false;
+          }, 300);
+        }, 50);
       }
     }
-    
-    // 触发年份变更事件
-    if (newYear !== props.selectedYear) {
-      emit('select-month', { year: newYear, month: props.selectedMonth });
+
+    // 如果切换到当前年份，且临时选中的月份超过当前月份，重置为当前月份
+    if (tempYear.value === currentYear && tempMonth.value > currentMonth) {
+      tempMonth.value = currentMonth;
     }
+    getData()
   }
 };
 
-// 格式化显示月份范围
-const formatMonthRange = computed(() => {
-  const year = props.selectedYear;
-  const month = props.selectedMonth;
+const hasRecordMonth = ref<number[]>([])
+const getData = async () => {
+  const {data: month} = await getCurrentYearRecord({year: tempYear.value});
+  hasRecordMonth.value = month.map((item: string) => Number(item));
+}
 
-  // 获取当月第一天和最后一天
-  const firstDay = new Date(year, month - 1, 1);
-  const lastDay = new Date(year, month, 0);
-
-  const startDate = `${month}月1日`;
-  const endDate = `${month}月${lastDay.getDate()}日`;
-
-  return `${startDate} - ${endDate}`;
-});
+// 判断指定月份是否有记录
+const handleDot = (month: number): boolean => {
+  return hasRecordMonth.value.includes(month);
+}
 </script>
 
 <template>
-  <up-popup :show="show" @close="closePopup" mode="bottom" :round="20" :closeOnClickOverlay="false">
+  <up-popup :show="show" @close="closePopup" mode="bottom" :round="20">
     <div class="month-picker">
       <div class="month-picker-header">
         <div class="title">按月查看</div>
@@ -113,20 +148,34 @@ const formatMonthRange = computed(() => {
       <div class="date-select" @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd">
         <!-- 年份选择 -->
         <div class="year-section">
-          <div class="year-label">{{ selectedYear }}年</div>
+          <div 
+            class="year-label" 
+            :class="{
+              'slide-left': slideDirection === 'left' && isAnimating,
+              'slide-right': slideDirection === 'right' && isAnimating
+            }"
+          >
+            {{ tempYear }}年
+          </div>
         </div>
         <!-- 月份网格 -->
-        <div class="months-grid">
+        <div 
+          class="months-grid"
+          :class="{
+            'slide-left': slideDirection === 'left' && isAnimating,
+            'slide-right': slideDirection === 'right' && isAnimating
+          }"
+        >
           <div
-            v-for="month in months"
-            :key="month"
-            class="month-item"
-            :class="{
-              'active': month === selectedMonth,
-              'selected-dot': month === selectedMonth,
-              'disabled': selectedYear === currentYear && month > new Date().getMonth() + 1
+              v-for="month in months"
+              :key="month"
+              class="month-item"
+              :class="{
+              'active': month === tempMonth,
+              'selected-dot': handleDot(month),
+              'disabled': tempYear === currentYear && month > currentMonth
             }"
-            @click="selectMonth(selectedYear, month)"
+              @click="selectMonth(tempYear, month)"
           >
             {{ month }}月
           </div>
@@ -168,6 +217,38 @@ const formatMonthRange = computed(() => {
   border-radius: 20px;
   position: relative;
   z-index: 1;
+  transition: transform 0.3s ease-out;
+}
+
+/* 滑动动画 */
+.slide-left {
+  animation: slideLeft 0.3s ease-out;
+}
+
+.slide-right {
+  animation: slideRight 0.3s ease-out;
+}
+
+@keyframes slideLeft {
+  0% {
+    transform: translateX(50%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideRight {
+  0% {
+    transform: translateX(-50%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 
 .year-section::before, .year-section::after {
@@ -194,6 +275,7 @@ const formatMonthRange = computed(() => {
   grid-template-columns: repeat(5, 1fr);
   gap: 15px;
   padding: 10px;
+  transition: transform 0.3s ease-out, opacity 0.3s ease-out;
 }
 
 .month-item {
@@ -204,6 +286,7 @@ const formatMonthRange = computed(() => {
   font-size: 16px;
   color: #000000;
   position: relative;
+  transition: all 0.2s ease;
 }
 
 .month-item.active {
@@ -235,4 +318,4 @@ const formatMonthRange = computed(() => {
 .month-item.disabled::after {
   display: none;
 }
-</style> 
+</style>

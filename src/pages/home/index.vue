@@ -24,8 +24,8 @@ onPageScroll(_.debounce((options: any) => toggle.value = options.scrollTop > 200
 const billList = ref<any[]>([])
 const currentDayTotal = ref(0)
 const pageParams = reactive<any>({
-  pageNo: 1,
-  pageSize: 5
+  startTime: '',
+  endTime: ''
 })
 const loading = ref(false)
 const hasMore = ref(true)
@@ -39,7 +39,6 @@ const getBillRecords = async () => {
     const res = await getBillRecordList(pageParams)
     if (res.code === 0) {
       billList.value = res.data
-      currentDayTotal.value = res.data[0]?.total || 0
     }
   } catch (error) {
     console.error('获取账单列表失败：', error)
@@ -52,7 +51,6 @@ const getBillRecords = async () => {
 const currentMonth = ref('')
 const monthlyExpense = ref(0)
 const monthlyBudget = ref(0)
-const dailyAvailable = ref(0)
 
 // 获取月度支出
 const getMonthlyExpense = async () => {
@@ -77,6 +75,25 @@ const openMonthPicker = () => {
   showMonthPicker.value = true
 }
 
+// 设置月份开始和结束时间
+const setMonthTimeRange = (year: number, month: number) => {
+  // 月份开始日期
+  const startDate = new Date(year, month - 1, 1);
+  // 月份结束日期（下个月的第0天就是当前月的最后一天）
+  const endDate = new Date(year, month, 0);
+
+  // 格式化日期字符串
+  const formatDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${d} 00:00:00`;
+  };
+
+  pageParams.startTime = formatDate(startDate);
+  pageParams.endTime = formatDate(endDate);
+};
+
 // 处理月份选择
 const handleMonthSelect = (data: { year: number, month: number }) => {
   selectedYear.value = data.year;
@@ -85,8 +102,12 @@ const handleMonthSelect = (data: { year: number, month: number }) => {
   // 更新当前月份
   currentMonth.value = formatYearMonth(data.year, data.month);
 
+  // 设置月份的时间范围
+  setMonthTimeRange(data.year, data.month);
+
   // 重新获取数据
   getMonthlyExpense();
+  getBillRecords();
 }
 
 // 格式化显示月份范围
@@ -97,6 +118,9 @@ const formatMonthRange = computed(() => {
 onShow(() => {
   // 初始化当前月份
   currentMonth.value = formatCurrentMonth();
+
+  // 设置当前月份的时间范围
+  setMonthTimeRange(selectedYear.value, selectedMonth.value);
 
   // 获取数据
   getBillRecords()
