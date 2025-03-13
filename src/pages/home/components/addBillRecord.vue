@@ -27,6 +27,7 @@ const touchStartX = ref(0)
 const pagesContainer = ref(null)
 const show = ref(false);
 const value1 = ref(Date.now());
+const showDatePicker = ref(false);
 
 // 页面滚动监听
 onPageScroll(_.debounce((options: any) => toggle.value = options.scrollTop > 200, 0))
@@ -52,14 +53,14 @@ const getTypeList = async () => {
 
 // 将分类分成每页最多10个（5个一行，共2行）
 const categoryPages = computed(() => {
-  const pages = []
-  allCategories.value.push({ID: 114514, name: '管理分类', icon: 'icon'})
-  for (let i = 0; i < allCategories.value.length; i += 10) {
-    const page = allCategories.value.slice(i, i + 10)
-    pages.push(page)
-  }
-  selectedCategory.value = pages[0][0]
-  return pages
+  // const pages = []
+  // allCategories.value.push({ID: 114514, name: '管理分类', icon: 'icon'})
+  // for (let i = 0; i < allCategories.value.length; i += 10) {
+  //   const page = allCategories.value.slice(i, i + 10)
+  //   pages.push(page)
+  // }
+  // selectedCategory.value = pages[0][0]
+  return []
 })
 
 // ====================== 计算器状态与方法 ======================
@@ -84,7 +85,7 @@ const displayAmount = computed(() => {
   if (waitingForSecondOperand.value && !hasStartedSecondOperand.value) {
     return previousAmount.value;
   }
-
+  console.log(amount.value,"amount.value")
   return amount.value;
 })
 
@@ -162,6 +163,7 @@ const calculateResult = () => {
  * @param num 点击的数字或小数点
  */
 const handleNumberClick = (num: any) => {
+  if (num === 'x') handleDelete()
   uni.vibrateShort({
     success: function () {
       console.log('success');
@@ -389,12 +391,23 @@ onMounted(() => {
 <template>
   <!-- 顶部导航栏 -->
   <div class="menu-button menu-toggle" :class="toggle ? 'toggle-on' : 'toggle-off'"
-       :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height}px;`">
+       :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height+15}px;`">
     <div class="flex-center">
       <div style="position: absolute;left: 10px" @click="backPage()">
-        <u-icon name="arrow-left" size="22" color="#fff"></u-icon>
+        <u-icon name="arrow-left" size="22" color="#000"></u-icon>
       </div>
-      <span class="font-xl">记一笔</span>
+      <div class="flex-align-center gap-5">
+        <div class="font-bold font-xl color-000">记一笔</div>
+        <!-- 分页指示器 -->
+        <div class="pagination">
+          <div
+              v-for="(_, index) in categoryPages"
+              :key="index"
+              :class="['indicator', currentPage === index ? 'active' : '']"
+              @click="currentPage = index"
+          ></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -402,15 +415,6 @@ onMounted(() => {
     <!-- 顶部金额显示卡片 -->
     <div class="home-banner" style="padding: 0 12px"
          :style="`--mgt: ${menuBtnRect.height + menuBtnRect.top}px`">
-      <card-tab isAutoHeight>
-        <div class="flx-justify-between width-100">
-          <div class="flex-start gap-10 color-E5E">
-            <up-icon name="red-packet" color="#fff" size="40"></up-icon>
-            <div class="font-sm">{{ selectedCategory.name }}</div>
-          </div>
-          <div class="color-0AC font-xl font-bold">{{ displayAmount }}</div>
-        </div>
-      </card-tab>
     </div>
 
     <!-- 分类选择区域 - 翻页效果 -->
@@ -462,65 +466,65 @@ onMounted(() => {
           </div>
         </div>
       </div>
-
-      <!-- 分页指示器 -->
-      <div class="pagination" v-if="allCategories.length > 10">
-        <div
-            v-for="(_, index) in categoryPages"
-            :key="index"
-            :class="['indicator', currentPage === index ? 'active' : '']"
-            @click="currentPage = index"
-        ></div>
-      </div>
     </div>
 
-    <!-- 数字键盘区域 -->
-    <div class="keypad">
-      <!-- 日期选择区域 -->
-      <div class="flex-start date-info">
-        <div class="date-item">
-          <up-datetime-picker
-              :show="show"
-              v-model="value1"
-              mode="datetime"
-              @cancel="show = false"
-              @confirm="show = false"
-          ></up-datetime-picker>
-          <div class="flex-start" @click="show = true">
-            <up-icon name="calendar" color="#fff" size="25"></up-icon>
-            <span>{{ formattedDate }}</span>
+    <!-- 占位空间，确保内容不被键盘遮挡 -->
+    <div class="keyboard-spacer"></div>
+  </div>
+
+  <!-- 数字键盘区域 - 固定在底部 -->
+  <div class="keypad-container">
+    <!-- 收支统计 -->
+    <div class="summary-cards card-container">
+      <div class="summary-card expense">
+        <div class="card-header">
+          <div class="card-icon">
+            <span class="emoji">💸</span>
           </div>
+          <div class="card-title">{{ selectedCategory.name }}</div>
+        </div>
+        <div class="card-amount">¥{{ displayAmount }}</div>
+      </div>
+      <div class="summary-card income">
+        <div class="card-header">
+          <div class="card-icon">
+            <span class="emoji">📝</span>
+          </div>
+          <div class="card-title">备注</div>
+        </div>
+        <div class="card-amount">0</div>
+      </div>
+    </div>
+    <div class="keypad">
+      <div class="number-pad">
+        <div
+            v-for="num in ['7','8','9','4','5','6','1','2','3','.','0','x']"
+            :key="num"
+            class="key-btn"
+            @click="handleNumberClick(num)"
+            :class="{ 'delete-btn': num === '⌫' }"
+        >
+          <template v-if="num === 'x'">
+            <div class="key flex-center">
+              <up-icon name="backspace" color="000" size="30"></up-icon>
+            </div>
+          </template>
+          <template v-else>
+            {{ num }}
+          </template>
         </div>
       </div>
-
-      <!-- 计算器按键布局 -->
-      <div class="keypad-grid">
-        <!-- 第一行: 7, 8, 9, 删除 -->
-        <div @click="handleNumberClick('7')" class="key">7</div>
-        <div @click="handleNumberClick('8')" class="key">8</div>
-        <div @click="handleNumberClick('9')" class="key">9</div>
-        <div @click="handleDelete" class="key flex-center">
-          <up-icon name="backspace" color="#E5E5E5" size="30"></up-icon>
-        </div>
-
-        <!-- 第二行: 4, 5, 6, + -->
-        <div @click="handleNumberClick('4')" class="key">4</div>
-        <div @click="handleNumberClick('5')" class="key">5</div>
-        <div @click="handleNumberClick('6')" class="key">6</div>
-        <div @click="handlePlus" class="key">+</div>
-
-        <!-- 第三行: 1, 2, 3, - -->
-        <div @click="handleNumberClick('1')" class="key">1</div>
-        <div @click="handleNumberClick('2')" class="key">2</div>
-        <div @click="handleNumberClick('3')" class="key">3</div>
-        <div @click="handleMinus" class="key">-</div>
-
-        <!-- 第四行: ., 0, 再记, 完成/= -->
-        <div @click="handleNumberClick('.')" class="key">.</div>
-        <div @click="handleNumberClick('0')" class="key">0</div>
-        <div @click="handleRecordAgain" class="key record-again">再记</div>
-        <div @click="handleComplete" class="key complete">{{ completeButtonText }}</div>
+      <div class="operation-pad">
+        <div class="key-btn date-btn" @click="showDatePicker = true">{{ formattedDate }}</div>
+        <div class="key-btn op-btn" @click="handleMinus">-</div>
+        <div class="key-btn op-btn" @click="handlePlus">+</div>
+        <div class="key-btn op-btn" @click="calculateResult">=</div>
       </div>
+    </div>
+    <!-- 底部按钮 -->
+    <div class="bottom-buttons">
+      <div class="action-btn secondary flex-center" @click="handleRecordAgain">再记</div>
+      <div class="action-btn primary flex-center" @click="handleComplete">记一笔</div>
     </div>
   </div>
 </template>
@@ -532,7 +536,8 @@ onMounted(() => {
 
 /* 页面基础样式 */
 .home-page {
-  padding: 15px 0 env(safe-area-inset-bottom) 0;
+  padding: 15px 0 0 0; /* 移除底部padding，由键盘区域处理 */
+  margin-bottom: calc(300px + env(safe-area-inset-bottom)); /* 为固定键盘留出空间 */
 }
 
 .home-banner {
@@ -614,7 +619,6 @@ onMounted(() => {
 .pagination {
   display: flex;
   justify-content: center;
-  margin-top: -18px;
 }
 
 .indicator {
@@ -664,35 +668,202 @@ onMounted(() => {
   text-overflow: ellipsis;
 }
 
-/* 数字键盘样式 */
-.keypad {
-  margin-top: auto;
-  padding-bottom: calc(16rpx + env(safe-area-inset-bottom));
+/* 键盘占位空间 */
+.keyboard-spacer {
+  height: 20px; /* 调整高度，确保内容和键盘之间有适当间距 */
 }
 
-.keypad-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1px;
-  background-color: rgba(255, 255, 255, .3);
+/* 收支统计卡片样式 */
+.summary-cards {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
 }
 
-.key {
-  padding: 20px;
-  background-color: #33363a;
-  text-align: center;
+.summary-card {
+  flex: 1;
+  background-color: rgba(244, 244, 244, .9);
+  border-radius: 12px;
+  padding: 8px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.card-icon {
   font-size: 20px;
+}
+
+.card-title {
+  font-size: 16px;
+  color: #666;
+  font-weight: 500;
+}
+
+.card-amount {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* 数字键盘样式 */
+.keypad-container {
+  background: #FFFFFF;
+  border-radius: 20px 20px 0 0;
+  box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding: 12px 12px env(safe-area-inset-bottom) 12px;
+}
+
+.keypad {
+  display: flex;
+  background-color: #FFFFFF;
+  gap: 12px;
+}
+
+.number-pad {
+  flex: 3;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.operation-pad {
+  flex: 1;
+  display: grid;
+  grid-template-rows: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.key-btn {
+  background-color: rgba(244, 244, 244, .9);
   border: none;
+  border-radius: 8px;
+  height: 48px;
+  font-size: 20px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
-  color: #E5E5E5;
+  transition: background-color 0.2s;
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent; /* 移除默认的蓝色高亮 */
 }
 
-.record-again {
-  font-size: 14px;
+.key-btn:active {
+  background-color: #f0f0f0; /* 更改为淡灰色 */
 }
 
-.complete {
-  background-color: #0ACB79;
+/* 添加自定义点击效果 */
+.key-btn::after {
+  content: '';
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, #dedede 10%, transparent 10.01%);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transform: scale(10, 10);
+  opacity: 0;
+  transition: transform .3s, opacity .5s;
+  border-radius: 8px; /* 保持与按钮相同的圆角 */
+}
+
+.key-btn:active::after {
+  transform: scale(0, 0);
+  opacity: .3;
+  transition: 0s;
+}
+
+.date-btn {
   font-size: 14px;
+  background-color: #DCE2EE;
+  color: #000;
+  font-weight: 500;
+}
+
+.date-btn:active {
+  background-color: #d0e8e7; /* 稍微深一点的淡绿色 */
+}
+
+.op-btn {
+  background-color: #DBE4E1;
+  color: #000000;
+}
+
+.op-btn:active {
+  background-color: #d3e5f0; /* 稍微深一点的淡蓝色 */
+}
+
+/* 底部按钮样式 */
+.bottom-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  background-color: #fff;
+}
+
+.action-btn {
+  padding: 12px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  margin-top: 15px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.action-btn::after {
+  content: '';
+  display: block;
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.3) 10%, transparent 10.01%);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transform: scale(10, 10);
+  opacity: 0;
+  transition: transform .3s, opacity .5s;
+  border-radius: 24px;
+}
+
+.action-btn:active::after {
+  transform: scale(0, 0);
+  opacity: .5;
+  transition: 0s;
+}
+
+.action-btn.primary {
+  background-color: #C3EAE5;
+  color: #183C3A;
+}
+
+.action-btn.primary:active {
+  background-color: #C3EAE5;
+}
+
+.action-btn.secondary {
+  background-color: #C3EAE5;
+  color: #183C3A;
 }
 </style>
