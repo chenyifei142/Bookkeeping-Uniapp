@@ -93,7 +93,7 @@ const handleTouchEnd = (e: TouchEvent) => {
   if (Math.abs(diffX) > 50) {
     // 设置动画状态
     isAnimating.value = true;
-    
+
     if (diffX > 0) {
       // 右滑，切换到上一年
       slideDirection.value = 'right';
@@ -122,20 +122,28 @@ const handleTouchEnd = (e: TouchEvent) => {
     if (tempYear.value === currentYear && tempMonth.value > currentMonth) {
       tempMonth.value = currentMonth;
     }
-    getData()
   }
 };
 
 const hasRecordMonth = ref<number[]>([])
 const getData = async () => {
-  const {data: month} = await getCurrentYearRecord({year: tempYear.value});
-  hasRecordMonth.value = month.map((item: string) => Number(item));
+  try {
+    const {data: month} = await getCurrentYearRecord({year: tempYear.value});
+    if (month?.length) hasRecordMonth.value = month.map((item: string) => Number(item));
+    else hasRecordMonth.value = [];
+  } catch (error) {
+    console.log("日历获取错误::", error);
+  }
 }
 
 // 判断指定月份是否有记录
 const handleDot = (month: number): boolean => {
   return hasRecordMonth.value.includes(month);
 }
+
+watch(tempYear, () => {
+  getData()
+})
 </script>
 
 <template>
@@ -148,9 +156,9 @@ const handleDot = (month: number): boolean => {
       <div class="date-select" @touchstart="handleTouchStart" @touchmove="handleTouchMove" @touchend="handleTouchEnd">
         <!-- 年份选择 -->
         <div class="year-section">
-          <div 
-            class="year-label" 
-            :class="{
+          <div
+              class="year-label"
+              :class="{
               'slide-left': slideDirection === 'left' && isAnimating,
               'slide-right': slideDirection === 'right' && isAnimating
             }"
@@ -159,9 +167,9 @@ const handleDot = (month: number): boolean => {
           </div>
         </div>
         <!-- 月份网格 -->
-        <div 
-          class="months-grid"
-          :class="{
+        <div
+            class="months-grid"
+            :class="{
             'slide-left': slideDirection === 'left' && isAnimating,
             'slide-right': slideDirection === 'right' && isAnimating
           }"
