@@ -26,6 +26,15 @@
       }
     },
     {
+      "path": "pages/CategoryManagement/index",
+      "style": {
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTitleText": "",
+        "enablePullDownRefresh": false,
+        "disableScroll": true
+      }
+    },
+    {
       "path": "pages/statistics/index",
       "style": {
         "navigationStyle": "custom",
