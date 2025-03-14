@@ -1,78 +1,118 @@
 <script setup lang="ts">
 import DefaultHomePage from "@/components/defaultPage/defaultHomePage.vue";
-import {backPage} from "@/utils";
+import {backPage, jumpPage, showToast} from "@/utils";
 import CardTab from "@/components/card/card-tab.vue";
 import {computed, ref, onBeforeMount, onMounted} from "vue";
 import {onPageScroll} from "@dcloudio/uni-app";
 import _ from "lodash";
 import {getBillTypeList, saveBillRecord} from "@/api/home/billRecord";
+import DatePicker from "@/components/datePicker/index.vue";
 
 // ====================== 类型定义 ======================
-type menuBtnRectType = {
+type MenuBtnRectType = {
   top: number;
   height: number;
 };
 
-type billType = {
-  ID: number;
+type BillType = {
+  id: number;
   name: string;
   icon: string;
 };
 
 // ====================== 布局与UI相关状态 ======================
-const menuBtnRect = ref<menuBtnRectType>({top: 0, height: 0})
+const menuBtnRect = ref<MenuBtnRectType>({top: 0, height: 0})
 const toggle = ref(false)
 const currentPage = ref(0)
 const touchStartX = ref(0)
 const pagesContainer = ref(null)
-const show = ref(false);
-const value1 = ref(Date.now());
 const showDatePicker = ref(false);
+const selectedDate = ref(new Date());
+
+// 备注相关状态
+const remark = ref(''); // 备注内容
+const showRemarkInput = ref(false); // 是否显示备注输入框
 
 // 页面滚动监听
-onPageScroll(_.debounce((options: any) => toggle.value = options.scrollTop > 200, 0))
+onPageScroll(_.debounce((options: any) => toggle.value = options.scrollTop > 200, 100))
 
 // 获取日期格式化显示
 const formattedDate = computed(() => {
-  const today = new Date()
-  const month = today.getMonth() + 1
-  const day = today.getDate()
-  return `${month.toString().padStart(2, '0')}月${day.toString().padStart(2, '0')}日`
+  const date = new Date(selectedDate.value);
+  const month = date.getMonth() + 1;
+  const day = date.getDate();
+  return `${month.toString().padStart(2, '0')}月${day.toString().padStart(2, '0')}日`;
 })
 
+// 日期时间相关状态
+const formattedConsumptionDate = computed(() => {
+  const date = new Date(selectedDate.value);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')} ${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}:00`;
+});
+
+// 处理日期选择确认
+const handleDateConfirm = (date: Date) => {
+  console.log('接收到的日期:', date.toLocaleString());
+  // 创建一个新的日期对象，确保Vue能检测到变化
+  selectedDate.value = new Date(date);
+  showDatePicker.value = false;
+
+  // 调试输出
+  console.log('更新后的日期:', selectedDate.value.toLocaleString());
+  console.log('格式化后的日期:', formattedDate.value);
+};
+
 // ====================== 分类相关状态与方法 ======================
-const selectedCategory = ref<any>({ID: '', name: '', icon: ''})
-const excludeFromAccount = ref(false)
-const allCategories = ref<billType[]>([])
+const selectedCategory = ref<Partial<BillType>>({id: undefined, name: '', icon: ''})
+const allCategories = ref<BillType[]>([])
+const manageCategoryItem = {id: 114514, name: '管理分类', icon: 'icon'}
 
 // 获取账单分类列表
 const getTypeList = async () => {
-  const {data: data} = await getBillTypeList()
-  allCategories.value = data
+  try {
+    const {data} = await getBillTypeList()
+    allCategories.value = data || []
+  } catch (error) {
+    console.error('获取分类列表失败:', error)
+    showToast('获取分类列表失败，请重试')
+  }
 }
 
 // 将分类分成每页最多10个（5个一行，共2行）
 const categoryPages = computed(() => {
-  // const pages = []
-  // allCategories.value.push({ID: 114514, name: '管理分类', icon: 'icon'})
-  // for (let i = 0; i < allCategories.value.length; i += 10) {
-  //   const page = allCategories.value.slice(i, i + 10)
-  //   pages.push(page)
-  // }
-  // selectedCategory.value = pages[0][0]
-  return []
+  const pages: BillType[][] = []
+  // 创建新数组，避免修改原数组
+  const categories = [...allCategories.value, manageCategoryItem]
+
+  for (let i = 0; i < categories.length; i += 10) {
+    const page = categories.slice(i, i + 10)
+    pages.push(page)
+  }
+  return pages
 })
+
+const handleSelectedCategory = (category: any) => {
+  if (category.id === 114514) {
+    jumpPage('pages/CategoryManagement/index')
+    return;
+  }
+  selectedCategory.value = category
+}
 
 // ====================== 计算器状态与方法 ======================
 // 基础状态
 const amount = ref('0')                      // 当前输入的数字
 const displayExpression = ref('')            // 显示的表达式
 const isCalculating = ref(false)             // 是否正在计算中
-const operationHistory = ref([]);            // 操作历史记录
-const currentOperation = ref('');            // 当前运算符（+/-）
-const previousAmount = ref('0');             // 第一个操作数
-const waitingForSecondOperand = ref(false);  // 是否等待第二个操作数输入
-const hasStartedSecondOperand = ref(false);  // 是否已开始输入第二个操作数
+const operationHistory = ref<string[]>([])   // 操作历史记录
+const currentOperation = ref('')             // 当前运算符（+/-）
+const previousAmount = ref('0')             // 第一个操作数
+const waitingForSecondOperand = ref(false)  // 是否等待第二个操作数输入
+const hasStartedSecondOperand = ref(false)  // 是否已开始输入第二个操作数
+
+// 长按删除相关变量
+const deleteTimer = ref<number | null>(null)
+const isLongPressing = ref(false)
 
 // 显示的金额或表达式
 const displayAmount = computed(() => {
@@ -88,13 +128,6 @@ const displayAmount = computed(() => {
   console.log(amount.value, "amount.value")
   return amount.value;
 })
-
-// 完成按钮文本："=" 或 "完成"
-const completeButtonText = computed(() => {
-  return isCalculating.value ? '=' : '完成';
-})
-
-// ====================== 计算器核心功能 ======================
 
 /**
  * 更新显示的计算表达式
@@ -113,7 +146,7 @@ const updateDisplayExpression = () => {
  * @param num 需要格式化的数字
  * @returns 格式化后的数字字符串
  */
-const formatNumber = (num: any) => {
+const formatNumber = (num: number): string => {
   // 转换为字符串并最多保留两位小数
   let str = parseFloat(num.toFixed(2)).toString();
 
@@ -159,19 +192,33 @@ const calculateResult = () => {
 }
 
 /**
+ * 清空所有数字
+ * 重置计算器状态
+ */
+const clearAllNumbers = () => {
+  amount.value = '0'
+  currentOperation.value = ''
+  displayExpression.value = ''
+  previousAmount.value = '0'
+  waitingForSecondOperand.value = false
+  hasStartedSecondOperand.value = false
+  isCalculating.value = false
+}
+
+/**
  * 处理数字点击
  * @param num 点击的数字或小数点
  */
-const handleNumberClick = (num: any) => {
+const handleNumberClick = (num: string) => {
   if (num === 'x') {
     handleDelete()
     return;
   }
-  uni.vibrateShort({
-    success: function () {
-      console.log('success');
-    }
-  });
+  // uni.vibrateShort({
+  //   success: function () {
+  //     console.log('success');
+  //   }
+  // });
 
   // 如果等待第二个操作数，且当前输入的是第一个数字
   if (waitingForSecondOperand.value) {
@@ -196,58 +243,41 @@ const handleNumberClick = (num: any) => {
 }
 
 /**
- * 处理加法操作
- * 设置运算符为+并更新状态
+ * 执行通用的运算符操作
+ * @param operator 运算符 (+ 或 -)
  */
-const handlePlus = () => {
+const handleOperator = (operator: string) => {
+  // 触觉反馈
   uni.vibrateShort({
-    success: function () {
-      console.log('success');
+    success: () => {
     }
-  });
+  })
 
   // 如果已经有未完成的操作，先计算结果
   if (currentOperation.value && hasStartedSecondOperand.value) {
-    calculateResult();
+    calculateResult()
   }
 
   // 保存当前值和操作
-  previousAmount.value = amount.value;
-  currentOperation.value = '+';
-  waitingForSecondOperand.value = true;
-  hasStartedSecondOperand.value = false; // 重置标志，表示还没开始输入第二个操作数
-  isCalculating.value = true;
+  previousAmount.value = amount.value
+  currentOperation.value = operator
+  waitingForSecondOperand.value = true
+  hasStartedSecondOperand.value = false // 重置标志，表示还没开始输入第二个操作数
+  isCalculating.value = true
 
-  // 立即更新显示表达式，显示加号
-  updateDisplayExpression();
+  // 立即更新显示表达式，显示运算符
+  updateDisplayExpression()
 }
 
 /**
- * 处理减法操作
- * 设置运算符为-并更新状态
+ * 处理加法操作
  */
-const handleMinus = () => {
-  uni.vibrateShort({
-    success: function () {
-      console.log('success');
-    }
-  });
+const handlePlus = () => handleOperator('+')
 
-  // 如果已经有未完成的操作，先计算结果
-  if (currentOperation.value && hasStartedSecondOperand.value) {
-    calculateResult();
-  }
-
-  // 保存当前值和操作
-  previousAmount.value = amount.value;
-  currentOperation.value = '-';
-  waitingForSecondOperand.value = true;
-  hasStartedSecondOperand.value = false; // 重置标志，表示还没开始输入第二个操作数
-  isCalculating.value = true;
-
-  // 立即更新显示表达式，显示减号
-  updateDisplayExpression();
-}
+/**
+ * 处理减法操作
+ */
+const handleMinus = () => handleOperator('-')
 
 /**
  * 处理删除操作
@@ -257,11 +287,11 @@ const handleMinus = () => {
  * 3. 最后逐位删除第一个操作数
  */
 const handleDelete = () => {
+  // 触觉反馈
   uni.vibrateShort({
-    success: function () {
-      console.log('success');
+    success: () => {
     }
-  });
+  })
 
   // 阶段1: 如果正在计算中且已开始输入第二个操作数
   if (isCalculating.value && hasStartedSecondOperand.value && amount.value !== '0') {
@@ -299,6 +329,89 @@ const handleDelete = () => {
 }
 
 /**
+ * 处理删除键长按开始
+ * 启动计时器，如果长按超过500ms则清空所有数字
+ */
+const handleDeleteLongPress = () => {
+  // 清除之前的计时器
+  if (deleteTimer.value !== null) {
+    clearTimeout(deleteTimer.value);
+  }
+
+  // 设置长按标志
+  isLongPressing.value = false;
+
+  // 启动新的计时器
+  deleteTimer.value = setTimeout(() => {
+    isLongPressing.value = true;
+    // 长按超过500ms，清空所有数字
+    clearAllNumbers();
+
+    // 触发震动反馈
+    uni.vibrateLong({
+      success: () => {
+      }
+    })
+  }, 500) as unknown as number; // 类型转换以解决setTimeout返回类型问题
+}
+
+/**
+ * 处理删除键长按结束
+ * 清除计时器
+ */
+const handleDeleteLongPressEnd = () => {
+  if (deleteTimer.value !== null) {
+    clearTimeout(deleteTimer.value);
+    deleteTimer.value = null;
+  }
+
+  // 如果不是长按，则执行普通的删除操作
+  if (!isLongPressing.value) {
+    handleDelete();
+  }
+
+  // 重置长按标志
+  isLongPressing.value = false;
+}
+
+/**
+ * 重置所有状态
+ */
+const resetAllState = () => {
+  amount.value = '0';
+  currentOperation.value = '';
+  operationHistory.value = [];
+  previousAmount.value = '0';
+  displayExpression.value = '';
+  waitingForSecondOperand.value = false;
+  hasStartedSecondOperand.value = false;
+  isCalculating.value = false;
+  remark.value = '';
+}
+
+/**
+ * 切换备注输入框的显示状态
+ */
+const toggleRemarkInput = () => {
+  showRemarkInput.value = !showRemarkInput.value;
+}
+
+/**
+ * 确认备注输入
+ */
+const confirmRemark = () => {
+  showRemarkInput.value = false;
+}
+
+/**
+ * 处理再记按钮
+ * 记录一笔并重置状态
+ */
+const handleRecordAgain = () => {
+  resetAllState();
+};
+
+/**
  * 处理完成或等于按钮
  * 如果正在计算中则执行计算，否则完成记账
  */
@@ -309,41 +422,30 @@ const handleComplete = async () => {
     return;
   }
 
-  const data = await saveBillRecord({
-    typeId: selectedCategory.value.toString(),
-    price: amount.value,
-    consumptionTime: "2025-03-10 15:02:53",
-    consumptionDate: "2025-03-10 15:02:53",
-  })
-  console.log(data, "data")
-  // 重置状态
-  amount.value = '0';
-  currentOperation.value = '';
-  operationHistory.value = [];
-  previousAmount.value = '0';
-  displayExpression.value = '';
-  waitingForSecondOperand.value = false;
-  hasStartedSecondOperand.value = false;
-  isCalculating.value = false;
-}
+  if (!selectedCategory.value.id) {
+    showToast('请选择类别！');
+    return;
+  }
 
-/**
- * 处理再记按钮
- * 记录一笔并重置状态
- */
-const handleRecordAgain = () => {
-  console.log('再记一笔');
+  try {
+    const response = await saveBillRecord({
+      typeId: selectedCategory.value.id.toString(),
+      price: amount.value,
+      consumptionTime: formattedConsumptionDate.value,
+      consumptionDate: formattedConsumptionDate.value,
+      remark: remark.value,
+    });
 
-  // 重置所有状态
-  amount.value = '0';
-  currentOperation.value = '';
-  operationHistory.value = [];
-  previousAmount.value = '0';
-  displayExpression.value = '';
-  waitingForSecondOperand.value = false;
-  hasStartedSecondOperand.value = false;
-  isCalculating.value = false;
-}
+    if (response.code === 0) {
+      backPage();
+    } else {
+      showToast(response.msg || '保存失败');
+    }
+  } catch (error) {
+    console.error('保存账单记录失败:', error);
+    showToast('保存失败，请重试');
+  }
+};
 
 // ====================== 触摸相关事件处理 ======================
 
@@ -352,16 +454,16 @@ const handleRecordAgain = () => {
  * @param e 触摸事件对象
  */
 const handleTouchStart = (e: any) => {
-  touchStartX.value = e.touches[0].clientX
-}
+  touchStartX.value = e.touches[0].clientX;
+};
 
 /**
  * 触摸移动事件处理
  * @param e 触摸事件对象
  */
-const handleTouchMove = (e: any) => {
+const handleTouchMove = (_: any) => {
   // 可以添加一些视觉反馈，如果需要的话
-}
+};
 
 /**
  * 触摸结束事件处理
@@ -369,20 +471,20 @@ const handleTouchMove = (e: any) => {
  * @param e 触摸事件对象
  */
 const handleTouchEnd = (e: any) => {
-  const touchEndX = e.changedTouches[0].clientX
-  const diffX = touchEndX - touchStartX.value
+  const touchEndX = e.changedTouches[0].clientX;
+  const diffX = touchEndX - touchStartX.value;
 
   // 如果滑动距离足够大，则切换页面
   if (Math.abs(diffX) > 50) {
     if (diffX > 0 && currentPage.value > 0) {
       // 右滑，显示上一页
-      currentPage.value--
+      currentPage.value--;
     } else if (diffX < 0 && currentPage.value < categoryPages.value.length - 1) {
       // 左滑，显示下一页
-      currentPage.value++
+      currentPage.value++;
     }
   }
-}
+};
 
 // ====================== 生命周期钩子 ======================
 onBeforeMount(() => menuBtnRect.value = uni.getMenuButtonBoundingClientRect())
@@ -393,7 +495,8 @@ onMounted(() => {
 
 <template>
   <!-- 顶部导航栏 -->
-  <div class="menu-button menu-toggle" :class="toggle ? 'toggle-on' : 'toggle-off'"
+  <div class="menu-button menu-toggle"
+       :class="toggle ? 'toggle-on' : 'toggle-off'"
        :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height+15}px;`">
     <div class="flex-center">
       <div style="position: absolute;left: 10px" @click="backPage()">
@@ -403,12 +506,11 @@ onMounted(() => {
         <div class="font-bold font-xl color-000">记一笔</div>
         <!-- 分页指示器 -->
         <div class="pagination">
-          <div
-              v-for="(_, index) in categoryPages"
-              :key="index"
-              :class="['indicator', currentPage === index ? 'active' : '']"
-              @click="currentPage = index"
-          ></div>
+          <div v-for="(_, index) in categoryPages"
+               :key="index"
+               :class="['indicator', currentPage === index ? 'active' : '']"
+               @click="currentPage = index">
+          </div>
         </div>
       </div>
     </div>
@@ -416,56 +518,61 @@ onMounted(() => {
 
   <div class="home-page">
     <!-- 顶部金额显示卡片 -->
-    <div class="home-banner" style="padding: 0 12px"
+    <div class="home-banner"
+         style="padding: 0 12px"
          :style="`--mgt: ${menuBtnRect.height + menuBtnRect.top}px`">
     </div>
 
     <!-- 分类选择区域 - 翻页效果 -->
     <div class="categories-container">
       <!-- 分类页面容器 -->
-      <div
-          class="categories-pages"
-          ref="pagesContainer"
-          @touchstart="handleTouchStart"
-          @touchmove="handleTouchMove"
-          @touchend="handleTouchEnd"
-      >
-        <div
-            v-for="(page, pageIndex) in categoryPages"
-            :key="pageIndex"
-            class="categories-page"
-            :style="{ transform: `translateX(${(pageIndex - currentPage) * 100}%)` }"
-        >
+      <div class="categories-pages"
+           ref="pagesContainer"
+           @touchstart="handleTouchStart"
+           @touchmove="handleTouchMove"
+           @touchend="handleTouchEnd">
+        <div v-for="(page, pageIndex) in categoryPages"
+             :key="pageIndex"
+             class="categories-page"
+             :style="{ transform: `translateX(${(pageIndex - currentPage) * 100}%)` }">
+
           <!-- 第一行分类 - 最多显示5个 -->
           <div class="categories-row">
-            <div
-                v-for="category in page.slice(0, Math.min(5, page.length))"
-                :key="category.ID"
-                @click="selectedCategory = category"
-                :class="['category-item', selectedCategory.ID === category.ID ? 'active' : '']"
-            >
-              <div class="icon-wrapper">
-                <up-icon name="red-packet" color="#fff" size="30"></up-icon>
+            <div v-for="category in page.slice(0, Math.min(5, page.length))"
+                 :key="category.id"
+                 @click="handleSelectedCategory(category)"
+                 class="category-item">
+              <div class="icon-wrapper"
+                   :class="['icon-wrapper', selectedCategory.id === category.id ? 'active' : '']">
+                <span class="category-icon">{{ category.icon }}</span>
               </div>
-              <span class="category-name">{{ category.name }}</span>
+              <span class="category-name"
+                    :class="[selectedCategory.id === category.id ? 'active' : '']">
+                {{ category.name }}
+              </span>
             </div>
           </div>
 
           <!-- 第二行分类 - 只有当有超过5个元素时才显示 -->
           <div class="categories-row" v-if="page.length > 5">
-            <div
-                v-for="category in page.slice(5)"
-                :key="category.ID"
-                @click="selectedCategory = category"
-                :class="['category-item', selectedCategory.ID === category.ID ? 'active' : '']"
-            >
-              <div class="icon-wrapper">
-                <up-icon name="red-packet" color="#fff" size="30"></up-icon>
+            <div v-for="category in page.slice(5)"
+                 :key="category.id"
+                 @click="handleSelectedCategory(category)"
+                 class="category-item">
+              <div class="icon-wrapper"
+                   :class="['icon-wrapper', selectedCategory.id === category.id ? 'active' : '']">
+                <span class="category-icon">{{ category.icon }}</span>
               </div>
-              <span class="category-name">{{ category.name }}</span>
+              <div class="category-name"
+                   :class="[selectedCategory.id === category.id ? 'active' : '']">
+                {{ category.name }}
+              </div>
             </div>
             <!-- 如果第二行不足5个，添加空白占位元素以保持布局 -->
-            <div v-for="i in 5 - (page.length - 5)" :key="`empty-${i}`" class="category-item-empty"></div>
+            <div v-for="i in 5 - (page.length - 5)"
+                 :key="`empty-${i}`"
+                 class="category-item-empty">
+            </div>
           </div>
         </div>
       </div>
@@ -479,36 +586,56 @@ onMounted(() => {
   <div class="keypad-container">
     <!-- 收支统计 -->
     <div class="summary-cards card-container">
+      <!-- 类别卡片 -->
       <div class="summary-card expense">
         <div class="card-header">
           <div class="card-icon">
-            <span class="emoji">💸</span>
+            <span class="emoji">{{ selectedCategory.icon || '🤖' }}</span>
           </div>
-          <div class="card-title">{{ selectedCategory.name }}</div>
+          <div class="card-title">{{ selectedCategory.name || '未选择' }}</div>
         </div>
         <div class="card-amount">¥{{ displayAmount }}</div>
       </div>
-      <div class="summary-card income">
+
+      <!-- 备注卡片 -->
+      <div class="summary-card income" @click="toggleRemarkInput">
         <div class="card-header">
           <div class="card-icon">
             <span class="emoji">📝</span>
           </div>
           <div class="card-title">备注</div>
         </div>
-        <div class="card-amount">0</div>
+        <div class="card-amount remark-text" v-if="!showRemarkInput">
+          {{ remark || '点击添加备注' }}
+        </div>
+        <div class="remark-input-container" v-else>
+          <input type="text"
+                 class="remark-input"
+                 v-model="remark"
+                 placeholder="请输入备注"
+                 maxlength="50"
+                 @blur="confirmRemark"
+                 @confirm="confirmRemark"
+                 focus
+                 cursor-spacing="20"/>
+        </div>
       </div>
     </div>
+
+    <!-- 键盘区域 -->
     <div class="keypad">
+      <!-- 数字键盘 -->
       <div class="number-pad">
-        <div
-            v-for="num in ['7','8','9','4','5','6','1','2','3','.','0','x']"
-            :key="num"
-            class="key-btn"
-            @click="handleNumberClick(num)"
-            :class="{ 'delete-btn': num === '⌫' }"
-        >
+        <div v-for="num in ['7','8','9','4','5','6','1','2','3','.','0','x']"
+             :key="num"
+             class="key-btn"
+             @click="num !== 'x' ? handleNumberClick(num) : null"
+             :class="{ 'delete-btn': num === 'x' }">
           <template v-if="num === 'x'">
-            <div class="key flex-center">
+            <div class="key flex-center"
+                 @touchstart="handleDeleteLongPress"
+                 @touchend="handleDeleteLongPressEnd"
+                 @touchcancel="handleDeleteLongPressEnd">
               <up-icon name="backspace" color="000" size="30"></up-icon>
             </div>
           </template>
@@ -517,27 +644,39 @@ onMounted(() => {
           </template>
         </div>
       </div>
+
+      <!-- 操作键盘 -->
       <div class="operation-pad">
-        <div class="key-btn date-btn" @click="showDatePicker = true">{{ formattedDate }}</div>
+        <div class="key-btn date-btn" @click="showDatePicker = true">
+          {{ formattedDate }}
+        </div>
         <div class="key-btn op-btn" @click="handleMinus">-</div>
         <div class="key-btn op-btn" @click="handlePlus">+</div>
         <div class="key-btn op-btn" @click="calculateResult">=</div>
       </div>
     </div>
+
     <!-- 底部按钮 -->
     <div class="bottom-buttons">
       <div class="action-btn secondary flex-center" @click="handleRecordAgain">再记</div>
       <div class="action-btn primary flex-center" @click="handleComplete">记一笔</div>
     </div>
   </div>
+
+  <!-- 日期选择器组件 -->
+  <DatePicker :show="showDatePicker"
+              :value="selectedDate"
+              @update:show="showDatePicker = $event"
+              @confirm="handleDateConfirm"/>
 </template>
 
 <style scoped>
+/* 通用组件样式覆盖 */
 :deep(.card) {
   padding: 20px 15px !important;
 }
 
-/* 页面基础样式 */
+/* ====================== 页面基础布局 ====================== */
 .home-page {
   padding: 15px 0 0 0; /* 移除底部padding，由键盘区域处理 */
   margin-bottom: calc(300px + env(safe-area-inset-bottom)); /* 为固定键盘留出空间 */
@@ -547,7 +686,39 @@ onMounted(() => {
   width: calc(100% - 24px); /* 让它比父容器小 12px */
 }
 
-/* 分类区域样式 */
+/* 键盘占位空间 */
+.keyboard-spacer {
+  height: 20px; /* 调整高度，确保内容和键盘之间有适当间距 */
+}
+
+/* ====================== 顶部导航与分页 ====================== */
+.toggle input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+/* 分页指示器样式 */
+.pagination {
+  display: flex;
+  justify-content: center;
+}
+
+.indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #d1d5db;
+  margin: 0 4px;
+  cursor: pointer;
+}
+
+.indicator.active {
+  background-color: #0ACB79;
+}
+
+/* ====================== 分类选择区域 ====================== */
+/* 分类区域容器 */
 .categories-container {
   position: relative;
   width: calc(100% - 24px); /* 让它比父容器小 12px */
@@ -582,10 +753,10 @@ onMounted(() => {
   justify-content: center;
   padding: 3px;
   border-radius: 8px;
-  background-color: #33363a;
   color: #E5E5E5;
   cursor: pointer;
   width: 16%; /* 略小于20%，以便有一点间距 */
+  -webkit-tap-highlight-color: transparent; /* 移除默认的蓝色高亮 */
 }
 
 .category-item-empty {
@@ -593,22 +764,28 @@ onMounted(() => {
   visibility: hidden; /* 不可见但占据空间 */
 }
 
-.category-item.active {
-  background-color: #0ACB79;
-  color: white;
-}
-
 .icon-wrapper {
-  padding: 4px;
-  border-radius: 8px;
+  width: 50px;
+  height: 50px;
+  background-color: #F4F4F4;
+  border-radius: 40%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid transparent;
+  transition: all 0.2s ease;
 }
 
-.icon {
-  width: 20px;
-  height: 20px;
+.icon-wrapper.active {
+  border: 2px solid #183C3A;
+}
+
+.category-icon {
+  font-size: 30px;
 }
 
 .category-name {
+  color: #929091;
   font-size: 12px;
   margin-top: 4px;
   text-align: center;
@@ -618,65 +795,12 @@ onMounted(() => {
   width: 100%;
 }
 
-/* 分页指示器样式 */
-.pagination {
-  display: flex;
-  justify-content: center;
+.category-name.active {
+  color: #000000;
+  font-weight: bold;
 }
 
-.indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background-color: #d1d5db;
-  margin: 0 4px;
-  cursor: pointer;
-}
-
-.indicator.active {
-  background-color: #0ACB79;
-}
-
-.toggle input {
-  opacity: 0;
-  width: 0;
-  height: 0;
-}
-
-/* 日期信息样式 */
-.date-info {
-  gap: 16px;
-  overflow-x: auto;
-  -ms-overflow-style: none; /* IE and Edge */
-  scrollbar-width: none; /* Firefox */
-  padding: 10px;
-  background-color: #33363a;
-  border-bottom: rgba(255, 255, 255, .3) 1px solid;
-}
-
-.date-info::-webkit-scrollbar {
-  display: none; /* Chrome, Safari and Opera */
-}
-
-.date-item {
-  display: flex;
-  align-items: center;
-  color: rgba(255, 255, 255, .6);
-  white-space: nowrap;
-}
-
-.truncate {
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* 键盘占位空间 */
-.keyboard-spacer {
-  height: 20px; /* 调整高度，确保内容和键盘之间有适当间距 */
-}
-
-/* 收支统计卡片样式 */
+/* ====================== 收支统计卡片 ====================== */
 .summary-cards {
   display: flex;
   gap: 12px;
@@ -685,34 +809,83 @@ onMounted(() => {
 
 .summary-card {
   flex: 1;
+  min-width: 0; /* 防止flex项目超出容器 */
   background-color: rgba(244, 244, 244, .9);
   border-radius: 12px;
   padding: 8px;
+  overflow: hidden; /* 确保内容不会溢出 */
 }
 
 .card-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   margin-bottom: 12px;
 }
 
 .card-icon {
   font-size: 20px;
+  flex-shrink: 0; /* 防止图标缩小 */
 }
 
 .card-title {
   font-size: 16px;
   color: #666;
   font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .card-amount {
   font-size: 24px;
   font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-/* 数字键盘样式 */
+/* 备注相关样式 */
+.remark-text {
+  color: #999; /* 使用灰色表示暂无备注 */
+  font-size: 18px; /* 稍微小一点的字体 */
+}
+
+.remark-input-container {
+  width: 100%;
+  position: relative;
+}
+
+.remark-input {
+  width: 100%;
+  background-color: transparent;
+  border: none;
+  border-bottom: 1px solid #C3EAE5;
+  font-size: 18px;
+  padding: 6px 0;
+  color: #333;
+  outline: none;
+  font-weight: 500;
+}
+
+.remark-input::placeholder {
+  color: #aaa;
+  font-size: 16px;
+  font-weight: normal;
+}
+
+/* 为备注卡片添加点击效果 */
+.summary-card.income {
+  position: relative;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.summary-card.income:active {
+  background-color: #eaeaea;
+}
+
+/* ====================== 数字键盘区域 ====================== */
 .keypad-container {
   background: #FFFFFF;
   border-radius: 20px 20px 0 0;
@@ -724,6 +897,7 @@ onMounted(() => {
   right: 0;
   z-index: 100;
   padding: 12px 12px env(safe-area-inset-bottom) 12px;
+  min-height: 750rpx; /* 添加最小高度 */
 }
 
 .keypad {
@@ -732,6 +906,7 @@ onMounted(() => {
   gap: 12px;
 }
 
+/* 数字键盘区域 */
 .number-pad {
   flex: 3;
   display: grid;
@@ -739,6 +914,7 @@ onMounted(() => {
   gap: 12px;
 }
 
+/* 操作键盘区域 */
 .operation-pad {
   flex: 1;
   display: grid;
@@ -746,6 +922,7 @@ onMounted(() => {
   gap: 12px;
 }
 
+/* 键盘按钮基础样式 */
 .key-btn {
   background-color: rgba(244, 244, 244, .9);
   border: none;
@@ -792,6 +969,7 @@ onMounted(() => {
   transition: 0s;
 }
 
+/* 日期按钮样式 */
 .date-btn {
   font-size: 14px;
   background-color: #DCE2EE;
@@ -803,6 +981,7 @@ onMounted(() => {
   background-color: #d0e8e7; /* 稍微深一点的淡绿色 */
 }
 
+/* 运算符按钮样式 */
 .op-btn {
   background-color: #DBE4E1;
   color: #000000;
@@ -812,7 +991,12 @@ onMounted(() => {
   background-color: #d3e5f0; /* 稍微深一点的淡蓝色 */
 }
 
-/* 底部按钮样式 */
+/* 添加删除键长按效果 */
+.delete-btn:active {
+  background-color: #f0d0d0; /* 轻微红色背景表示删除操作 */
+}
+
+/* ====================== 底部按钮 ====================== */
 .bottom-buttons {
   display: grid;
   grid-template-columns: 1fr 1fr;
