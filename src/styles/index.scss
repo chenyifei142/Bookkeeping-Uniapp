@@ -314,6 +314,19 @@
   right: 30px;
   bottom: calc(160rpx + env(safe-area-inset-bottom));
   z-index: 10;
+  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  will-change: transform, opacity;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.float-action-button:active {
+  transform: scale(0.95);
+}
+
+.button-hidden {
+  opacity: 0;
+  transform: translateY(20px) scale(0.9);
+  pointer-events: none;
 }
 
 .add-confirm-button {

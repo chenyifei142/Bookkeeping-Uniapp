@@ -85,7 +85,7 @@ const displayAmount = computed(() => {
   if (waitingForSecondOperand.value && !hasStartedSecondOperand.value) {
     return previousAmount.value;
   }
-  console.log(amount.value,"amount.value")
+  console.log(amount.value, "amount.value")
   return amount.value;
 })
 
@@ -163,7 +163,10 @@ const calculateResult = () => {
  * @param num 点击的数字或小数点
  */
 const handleNumberClick = (num: any) => {
-  if (num === 'x') handleDelete()
+  if (num === 'x') {
+    handleDelete()
+    return;
+  }
   uni.vibrateShort({
     success: function () {
       console.log('success');

@@ -1,23 +1,27 @@
 <script setup lang="ts">
 
-import {onBeforeMount, onMounted, ref} from "vue";
+import {onBeforeMount, onMounted, ref, watch} from "vue";
 import _ from "lodash";
 
 type menuBtnRectType = {
   top: number;
   height: number;
 };
-withDefaults(defineProps<{
+const props = withDefaults(defineProps<{
   isOtherHigh: number
 }>(), {
   isOtherHigh: 0
 })
 
+// 定义emit，用于向父组件传递toggle状态
+const emit = defineEmits(['update:toggle'])
+
 const toggle = ref(false)
 const handleScroll = _.debounce((e: any) => {
   const scrollTop = e.detail.scrollTop
-  console.log(scrollTop, "scrollTop")
   toggle.value = scrollTop > 200
+  // 向父组件传递toggle状态
+  emit('update:toggle', toggle.value)
 }, 0)
 
 const menuBtnRect = ref<menuBtnRectType>({top: 0, height: 0})
@@ -33,8 +37,8 @@ onMounted(() => {
 </script>
 
 <template>
-  <scroll-view class="contain" scroll-y show-scrollbar="false" 
-               enhanced="true" 
+  <scroll-view class="contain" scroll-y show-scrollbar="false"
+               enhanced="true"
                :style="`--safe-bottom: ${safeAreaInsetBottom}px;`"
                @scroll="handleScroll">
     <div class="menu-button menu-toggle" :class="toggle ? 'toggle-on' : 'toggle-off'"
@@ -55,7 +59,7 @@ onMounted(() => {
 <style scoped>
 .contain {
   width: 100vw;
-  height: 100vh;
+  height: calc(100vh - (40px + var(--safe-bottom, 0px)));
   box-sizing: border-box;
   /* 修改为flex布局 */
   display: flex;
@@ -67,6 +71,11 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
+}
+
+.menu-toggle {
+  will-change: transform, background-color;
+  transition: transform 0.3s ease, background-color 0.3s ease, color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .bottom-safe-area {

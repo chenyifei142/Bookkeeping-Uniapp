@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {onMounted, ref, reactive, computed} from 'vue'
-import {onPageScroll, onShow} from "@dcloudio/uni-app";
+import {onShow} from "@dcloudio/uni-app";
 import _ from "lodash";
 import {getBillRecordList, getTotalExpenseMonthly} from '@/api/home/billRecord'
 import DefaultHomePage from "@/components/defaultPage/defaultHomePage.vue";
@@ -18,7 +18,6 @@ import {
 
 // 页面滚动状态
 const toggle = ref(false)
-onPageScroll(_.debounce((options: any) => toggle.value = options.scrollTop > 200, 0))
 
 // 账单列表数据
 const billList = ref<any[]>([])
@@ -130,9 +129,9 @@ onShow(() => {
 
 <template>
   <basic-layout>
-    <default-home-page :is-other-high="15">
+    <default-home-page :is-other-high="15" @update:toggle="toggle = $event">
       <template #title>
-        <div class="flex-center">
+        <div class="flex-center" style="height: 100%">
           <div class="calendar-icon" style="position: absolute;left: 10px" @click="openMonthPicker">
             <u-icon name="calendar" size="25" bold color="#5E5D5B"></u-icon>
           </div>
@@ -208,7 +207,8 @@ onShow(() => {
 
   <div class="float-action-button icon-add-circle flex-center gap-10"
        @click="jumpPage('pages/home/components/addBillRecord')"
-       v-if="!toggle">
+       v-show="true"
+       :class="{'button-hidden': toggle}">
     <img class="add-icon" src="@/static/add.png" alt="">
     <span class="color-183">记一笔</span>
   </div>
