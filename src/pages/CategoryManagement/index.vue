@@ -13,16 +13,16 @@
             v-for="(category, index) in categories"
             :key="category.id"
             class="category-wrapper"
-            :class="{ 'sorting': isSortMode }"
+            :class="{ 'sorting': isSortMode, 'dragging': currentIndex === index && isDragging }"
             :style="{
               transform: currentIndex === index ? `translateY(${currentY - startY}px)` : 'none',
-              transition: currentIndex === index ? 'none' : 'transform 0.2s ease',
+              transition: currentIndex === index && isDragging ? 'none' : 'transform 0.2s ease',
               position: currentIndex === index ? 'relative' : 'static',
               zIndex: currentIndex === index ? 999 : 1
             }"
             @touchstart="handleTouchStart($event, index)"
             @touchmove="handleTouchMove($event, index)"
-            @touchend="handleTouchEnd($event, index)"
+            @touchend="handleTouchEnd(index)"
         >
           <div class="category-item">
             <div class="category-header" @click="toggleCategory(category)">
@@ -33,7 +33,7 @@
                 <div class="category-details">
                   <div class="category-name">{{ category.name }}</div>
                   <div class="category-stats">
-                    {{ category.subCategories.length }}个子分类，{{ category.quickNotes }}条快捷备注
+                    {{ category?.children?.length }}个子分类，{{ category.quickNotes }}条快捷备注
                   </div>
                 </div>
               </div>
@@ -55,7 +55,7 @@
                     添加
                   </div>
                   <div
-                      v-for="(sub, index) in category.subCategories"
+                      v-for="(sub, index) in category.children"
                       :key="index"
                       class="subcategory-item"
                       @click.stop="editSubcategory(category, sub)"
@@ -82,46 +82,44 @@
     </scroll-view>
 
     <!-- 添加/编辑子分类弹窗 -->
-    <div v-if="showModal" class="modal">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>{{ isEditing ? '编辑子分类' : '添加子分类' }}</h3>
-          <div @click="closeModal" class="close-btn">取消</div>
-        </div>
-
-        <div class="form-group">
-          <label>图标</label>
-          <div class="icon-selector">
-            <div
-                v-for="icon in availableIcons"
-                :key="icon"
-                class="icon-option"
-                :class="{ 'selected': icon === selectedIcon }"
-                @click="selectedIcon = icon"
-            >
-              {{ icon }}
-            </div>
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label>名称</label>
-          <input v-model="subcategoryName" class="input" placeholder="请输入子分类名称"/>
-        </div>
-
-        <div class="div-group">
-          <div v-if="isEditing" @click="deleteSubcategory" class="delete-div">删除</div>
-          <div @click="saveSubcategory" class="save-div">保存</div>
-        </div>
-      </div>
-    </div>
+    <subcategory-editor
+      :show="showModal"
+      :is-editing="isEditing"
+      :category-data="selectedCategory"
+      :subcategory-data="selectedSubcategory"
+      @update:show="showModal = $event"
+      @save="handleSaveSubcategory"
+      @delete="handleDeleteSubcategory"
+    />
   </div>
 </template>
 
-<script setup>
-import {ref, reactive} from 'vue'
+<script lang="ts" setup>
+import {ref, reactive, computed, onMounted, watch} from 'vue'
+import {getBillTypeList} from "@/api/home/billRecord";
+import {showToast} from "@/utils";
+import {onShow} from "@dcloudio/uni-app";
+import SubcategoryEditor from '@/components/subcategoryEditor/index.vue'
 
-const categories = ref([
+// 定义类型
+interface Subcategory {
+  icon: string;
+  name: string;
+}
+
+interface Category {
+  id: number;
+  name: string;
+  icon: string;
+  bgColor: string;
+  expanded: boolean;
+  quickNotes: number;
+  children: Subcategory[];
+  note?: string;
+}
+
+// 确保每个分类有唯一ID
+const categories = ref<Category[]>([
   {
     id: 1,
     name: '餐饮',
@@ -129,7 +127,7 @@ const categories = ref([
     bgColor: '#FFF3E0',
     expanded: true,
     quickNotes: 0,
-    subCategories: [
+    children: [
       {icon: '🌅', name: '早餐'},
       {icon: '🌞', name: '午餐'},
       {icon: '🌙', name: '晚饭'},
@@ -144,7 +142,7 @@ const categories = ref([
     expanded: false,
     quickNotes: 0,
     note: '(自定义)',
-    subCategories: []
+    children: []
   },
   {
     id: 3,
@@ -154,7 +152,7 @@ const categories = ref([
     expanded: false,
     quickNotes: 0,
     note: '(自定义)',
-    subCategories: []
+    children: []
   },
   {
     id: 4,
@@ -164,7 +162,7 @@ const categories = ref([
     expanded: false,
     quickNotes: 0,
     note: '(自定义)',
-    subCategories: []
+    children: []
   },
   {
     id: 5,
@@ -173,7 +171,7 @@ const categories = ref([
     bgColor: '#FFF8E1',
     expanded: false,
     quickNotes: 0,
-    subCategories: []
+    children: []
   },
   {
     id: 6,
@@ -182,7 +180,7 @@ const categories = ref([
     bgColor: '#F3E5F5',
     expanded: false,
     quickNotes: 0,
-    subCategories: []
+    children: []
   },
   {
     id: 7,
@@ -191,185 +189,228 @@ const categories = ref([
     bgColor: '#FFEBEE',
     expanded: false,
     quickNotes: 0,
-    subCategories: []
+    children: []
   },
   {
-    id: 7,
-    name: '水果',
-    icon: '🍉',
-    bgColor: '#FFEBEE',
+    id: 8,  // 修复重复ID
+    name: '蔬菜',
+    icon: '🥦',
+    bgColor: '#E8F5E9',
     expanded: false,
     quickNotes: 0,
-    subCategories: []
+    children: []
   },
   {
-    id: 7,
-    name: '水果',
-    icon: '🍉',
-    bgColor: '#FFEBEE',
+    id: 9,  // 修复重复ID
+    name: '交通',
+    icon: '🚗',
+    bgColor: '#E3F2FD',
     expanded: false,
     quickNotes: 0,
-    subCategories: []
+    children: []
   }
 ])
+
+// 获取账单分类列表
+const getTypeList = async () => {
+  try {
+    const {data} = await getBillTypeList()
+    categories.value = data || []
+  } catch (error) {
+    console.error('获取分类列表失败:', error)
+    showToast('获取分类列表失败，请重试')
+  }
+}
+
+onShow(async () => {
+  console.log("我进来咯")
+  await getTypeList()
+})
+
 
 // 弹窗状态
 const showModal = ref(false)
 const isEditing = ref(false)
-const selectedCategory = ref(null)
-const selectedSubcategory = ref(null)
-const subcategoryName = ref('')
-const selectedIcon = ref('')
-
-// 可用图标列表
-const availableIcons = [
-  '🍳', '🍲', '🍜', '🍚', '🍖', '🍗', '🍔', '🍕', '🌮', '🌯', '🥪', '🥗',
-  '🍱', '🥘', '🥓', '🍟', '🍤', '🍙', '🍘', '🍥', '🥠', '🥮', '🍡', '🥟',
-  '🍦', '🍧', '🍨', '🍩', '🍪', '🎂', '🍰', '🧁', '🥧', '🍫', '🍬', '🍭',
-  '🍮', '🍯', '🍼', '🥛', '☕', '🍵', '🍶', '🍾', '🍷', '🍸', '🍹', '🍺'
-]
+const selectedCategory = ref<Category | null>(null)
+const selectedSubcategory = ref<Subcategory | null>(null)
 
 // 排序相关状态
 const isSortMode = ref(false)
 const currentIndex = ref(-1)
 const startY = ref(0)
 const currentY = ref(0)
-const itemHeight = 92 // 每个分类项的高度（包括margin）
-const isDragging = ref(false) // 新增：标记是否正在拖拽
+const itemHeight = ref(92) // 每个分类项的高度（包括margin）
+const isDragging = ref(false) // 标记是否正在拖拽
+const initialOrder = ref<Category[]>([]) // 存储初始顺序，用于撤销排序
 
 // 展开/折叠分类
-const toggleCategory = (category) => {
+const toggleCategory = (category: Category) => {
   if (isSortMode.value || isDragging.value) return
   category.expanded = !category.expanded
 }
 
 // 显示添加子分类弹窗
-const showAddSubcategory = (category) => {
+const showAddSubcategory = (category: Category) => {
   if (isSortMode.value || isDragging.value) return
   selectedCategory.value = category
   isEditing.value = false
-  subcategoryName.value = ''
-  selectedIcon.value = availableIcons[0]
   showModal.value = true
 }
 
 // 显示编辑子分类弹窗
-const editSubcategory = (category, subcategory) => {
+const editSubcategory = (category: Category, subcategory: Subcategory) => {
   if (isSortMode.value || isDragging.value) return
   selectedCategory.value = category
   selectedSubcategory.value = subcategory
   isEditing.value = true
-  subcategoryName.value = subcategory.name
-  selectedIcon.value = subcategory.icon
   showModal.value = true
 }
 
-// 保存子分类
-const saveSubcategory = () => {
-  if (!subcategoryName.value.trim()) {
-    alert('请输入子分类名称')
-    return
+// 监听弹窗关闭时重置状态
+watch(() => showModal.value, (newVal) => {
+  if (!newVal) {
+    // 弹窗关闭时重置状态
+    selectedCategory.value = null
+    selectedSubcategory.value = null
   }
+})
 
+// 保存子分类 - 由子组件调用
+const handleSaveSubcategory = (data: {name: string, icon: string}) => {
   if (isEditing.value && selectedSubcategory.value) {
     // 编辑现有子分类
-    selectedSubcategory.value.name = subcategoryName.value
-    selectedSubcategory.value.icon = selectedIcon.value
-  } else {
+    selectedSubcategory.value.name = data.name
+    selectedSubcategory.value.icon = data.icon
+  } else if (selectedCategory.value) {
     // 添加新子分类
-    selectedCategory.value.subCategories.push({
-      icon: selectedIcon.value,
-      name: subcategoryName.value
+    selectedCategory.value.children.push({
+      icon: data.icon,
+      name: data.name
     })
   }
-
-  closeModal()
 }
 
-// 删除子分类
-const deleteSubcategory = () => {
-  if (confirm('确定要删除这个子分类吗？')) {
-    const index = selectedCategory.value.subCategories.findIndex(
-        sub => sub === selectedSubcategory.value
+// 删除子分类 - 由子组件调用
+const handleDeleteSubcategory = () => {
+  if (selectedCategory.value && selectedSubcategory.value) {
+    const index = selectedCategory.value.children.findIndex(
+      (sub: Subcategory) => sub === selectedSubcategory.value
     )
     if (index !== -1) {
-      selectedCategory.value.subCategories.splice(index, 1)
+      selectedCategory.value.children.splice(index, 1)
     }
-    closeModal()
   }
-}
-
-// 关闭弹窗
-const closeModal = () => {
-  showModal.value = false
-  selectedCategory.value = null
-  selectedSubcategory.value = null
-}
-
-// 返回上一页
-const goBack = () => {
-  // 实际应用中这里可以使用路由导航
-  console.log('返回上一页')
 }
 
 // 切换排序模式
 const toggleSortMode = () => {
-  isSortMode.value = !isSortMode.value
-  if (isSortMode.value) {
+  if (!isSortMode.value) {
+    // 进入排序模式，保存初始顺序以便可以撤销
+    initialOrder.value = [...categories.value]
+
     // 进入排序模式时，收起所有子分类列表
-    categories.value.forEach(category => {
+    categories.value.forEach((category: Category) => {
       category.expanded = false
     })
   } else {
+    // 退出排序模式，保存新顺序
     saveCategoryOrder()
   }
+
+  isSortMode.value = !isSortMode.value
+  isDragging.value = false
+  currentIndex.value = -1
 }
 
 // 触摸开始
-const handleTouchStart = (e, index) => {
+const handleTouchStart = (e: TouchEvent, index: number) => {
   if (!isSortMode.value) return
+
+  // 防止默认行为和事件冒泡
   e.preventDefault()
+  e.stopPropagation()
+
+  // 初始化拖拽状态
   isDragging.value = false
   currentIndex.value = index
   startY.value = e.touches[0].clientY
-  currentY.value = e.touches[0].clientY
+  currentY.value = startY.value
 }
 
 // 触摸移动
-const handleTouchMove = (e, index) => {
+const handleTouchMove = (e: TouchEvent, index: number) => {
   if (!isSortMode.value || currentIndex.value !== index) return
+
+  // 防止默认行为和事件冒泡
   e.preventDefault()
+  e.stopPropagation()
+
+  // 更新当前位置
   currentY.value = e.touches[0].clientY
   const moveY = currentY.value - startY.value
 
+  // 判断是否开始拖拽（移动超过5px）
   if (Math.abs(moveY) > 5) {
     isDragging.value = true
   }
 
-  const targetIndex = Math.floor(moveY / itemHeight) + index
+  // 计算目标位置索引
+  const moveDistance = currentY.value - startY.value
+  const direction = moveDistance > 0 ? 1 : -1
+  const absDistance = Math.abs(moveDistance)
+  const moveCount = Math.floor(absDistance / itemHeight.value)
 
-  if (targetIndex !== index && targetIndex >= 0 && targetIndex < categories.value.length) {
-    const temp = categories.value[index]
-    categories.value.splice(index, 1)
-    categories.value.splice(targetIndex, 0, temp)
-    currentIndex.value = targetIndex
-    startY.value = currentY.value
+  // 只有当移动足够距离时才交换位置
+  if (moveCount > 0) {
+    let targetIndex = index + (moveCount * direction)
+
+    // 确保目标索引在有效范围内
+    targetIndex = Math.max(0, Math.min(categories.value.length - 1, targetIndex))
+
+    if (targetIndex !== index) {
+      // 交换位置
+      const temp = categories.value[index]
+      categories.value.splice(index, 1)
+      categories.value.splice(targetIndex, 0, temp)
+
+      // 更新当前索引和起始位置
+      currentIndex.value = targetIndex
+      startY.value = currentY.value
+    }
   }
 }
 
 // 触摸结束
-const handleTouchEnd = (e, index) => {
+const handleTouchEnd = (index: number) => {
   if (!isSortMode.value) return
-  e.preventDefault()
-  currentIndex.value = -1
+
+  // 重置拖拽状态
   isDragging.value = false
+  currentIndex.value = -1
 }
 
 // 保存分类顺序
 const saveCategoryOrder = () => {
-  // TODO: 调用API保存新的分类顺序
+  // 这里可以调用API保存新的分类顺序
   console.log('保存新的分类顺序:', categories.value.map(c => c.id))
+
+  // 示例：可以在这里添加保存到本地存储的逻辑
+  try {
+    uni.setStorageSync('categoryOrder', JSON.stringify(categories.value.map(c => c.id)))
+    uni.showToast({
+      title: '排序已保存',
+      icon: 'success',
+      duration: 2000
+    })
+  } catch (e) {
+    console.error('保存排序失败', e)
+  }
 }
+
+// 初始化处理
+onMounted(() => {
+  // 初始化逻辑可以放在这里
+})
 </script>
 
 <style scoped>
@@ -380,6 +421,24 @@ const saveCategoryOrder = () => {
   padding: 12px;
   display: flex;
   flex-direction: column;
+}
+
+.flx-justify-between {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.font-bold {
+  font-weight: bold;
+}
+
+.font-2xl {
+  font-size: 18px;
+}
+
+.font-sm {
+  font-size: 14px;
 }
 
 .category-page {
@@ -408,6 +467,11 @@ const saveCategoryOrder = () => {
 
 .category-wrapper.sorting {
   z-index: 2;
+}
+
+.category-wrapper.dragging {
+  opacity: 0.9;
+  z-index: 1000;
 }
 
 .category-item {
@@ -581,135 +645,19 @@ const saveCategoryOrder = () => {
   color: #00ACC1;
 }
 
-/* 弹窗样式 */
+/* 删除不再使用的弹窗样式 */
+.subcategory-popup,
+.popup-header,
+.popup-title,
+.form-group,
+.input,
+.icon-selector,
+.icon-option,
+.popup-footer,
+.confirm-btn,
+.delete-btn,
 .modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-}
-
-.modal-content {
-  width: 90%;
-  max-width: 320px;
-  background-color: #fff;
-  border-radius: 12px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: #999;
-  cursor: pointer;
-}
-
-.form-group {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.form-group label {
-  font-size: 14px;
-  color: #666;
-}
-
-.input {
-  padding: 10px;
-  border: 1px solid #eee;
-  border-radius: 6px;
-  font-size: 14px;
-}
-
-.icon-selector {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 8px;
-  max-height: 200px;
-  overflow-y: auto;
-}
-
-.icon-option {
-  width: 40px;
-  height: 40px;
-  border-radius: 8px;
-  border: 1px solid #eee;
-  background-color: #f9f9f9;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 20px;
-  cursor: pointer;
-}
-
-.icon-option.selected {
-  border-color: #2196F3;
-  background-color: #E3F2FD;
-}
-
-.div-group {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 8px;
-}
-
-.save-div {
-  padding: 10px 20px;
-  border-radius: 6px;
-  border: none;
-  background-color: #2196F3;
-  color: white;
-  font-size: 14px;
-  cursor: pointer;
-  flex: 1;
-}
-
-.delete-div {
-  padding: 10px 20px;
-  border-radius: 6px;
-  border: none;
-  background-color: #f5f5f5;
-  color: #F44336;
-  font-size: 14px;
-  cursor: pointer;
-  margin-right: 8px;
-}
-
-/* 展开/折叠动画 */
-.expand-enter-active,
-.expand-leave-active {
-  transition: all 0.3s ease;
-  max-height: 500px;
-  overflow: hidden;
-}
-
-.expand-enter-from,
-.expand-leave-to {
-  max-height: 0;
-  opacity: 0;
-  padding: 0;
-  margin: 0;
+  display: none;
 }
 
 .sort-button {
@@ -724,3 +672,4 @@ const saveCategoryOrder = () => {
   background-color: #C5CBD5;
 }
 </style>
+
