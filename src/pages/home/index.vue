@@ -2,7 +2,7 @@
 import {onMounted, ref, reactive, computed} from 'vue'
 import {onShow} from "@dcloudio/uni-app";
 import _ from "lodash";
-import {getBillRecordList, getTotalExpenseMonthly} from '@/api/home/billRecord'
+import {getBillRecordList, getTotalExpenseMonthly} from '@/api/billRecord'
 import DefaultHomePage from "@/components/defaultPage/defaultHomePage.vue";
 import {jumpPage} from "@/utils";
 import BasicLayout from "@/components/layout/basic-layout.vue";

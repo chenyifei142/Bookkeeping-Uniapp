@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import {ref, computed, watch} from 'vue';
-import {getCurrentYearRecord} from "@/api/home/billRecord";
+import {getCurrentYearRecord} from "@/api/billRecord";
 
 // 定义组件的props
 const props = defineProps({

@@ -5,7 +5,7 @@ import CardTab from "@/components/card/card-tab.vue";
 import {computed, ref, onBeforeMount, onMounted} from "vue";
 import {onPageScroll} from "@dcloudio/uni-app";
 import _ from "lodash";
-import {getBillTypeList, saveBillRecord} from "@/api/home/billRecord";
+import {getBillTypeList, saveBillRecord} from "@/api/billRecord";
 import DatePicker from "@/components/datePicker/index.vue";
 
 // ====================== 类型定义 ======================
@@ -505,7 +505,7 @@ onMounted(() => {
       <div class="flex-align-center gap-5">
         <div class="font-bold font-xl color-000">记一笔</div>
         <!-- 分页指示器 -->
-        <div class="pagination">
+        <div class="pagination" v-if="allCategories.length > 9">
           <div v-for="(_, index) in categoryPages"
                :key="index"
                :class="['indicator', currentPage === index ? 'active' : '']"
@@ -714,7 +714,7 @@ onMounted(() => {
 }
 
 .indicator.active {
-  background-color: #0ACB79;
+  background-color: #000000;
 }
 
 /* ====================== 分类选择区域 ====================== */

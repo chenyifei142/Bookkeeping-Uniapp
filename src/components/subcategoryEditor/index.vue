@@ -21,7 +21,7 @@
               type="text"
               class="type-name-input"
               placeholder="点击输入名称"
-              v-model="typeName"
+              v-model="subcategoryName"
               ref="inputRef"
               @focus="inputFocused = true"
               @blur="inputFocused = false"
@@ -133,6 +133,10 @@ const selectedCategory = ref('Smileys & Emotion')
 const emojiCategories = ref<string[]>([])
 // emoji数据集合，按分类存储
 const emojisGrouped = ref<Record<string, string[]>>({})
+// 输入框焦点状态
+const inputFocused = ref(false)
+// 输入框引用
+const inputRef = ref(null)
 // 过滤后的可用图标列表
 const filteredIcons = computed(() => {
   if (emojisGrouped.value[selectedCategory.value]) {

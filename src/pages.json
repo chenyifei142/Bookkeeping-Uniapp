@@ -33,6 +33,14 @@
         "enablePullDownRefresh": false,
         "disableScroll": true
       }
+    },{
+      "path": "pages/CategoryManagement/details",
+      "style": {
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTitleText": "",
+        "enablePullDownRefresh": false,
+        "disableScroll": true
+      }
     },
     {
       "path": "pages/statistics/index",
