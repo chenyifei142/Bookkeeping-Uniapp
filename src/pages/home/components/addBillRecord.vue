@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import DefaultHomePage from "@/components/defaultPage/defaultHomePage.vue";
 import {backPage, jumpPage, showToast} from "@/utils";
-import CardTab from "@/components/card/card-tab.vue";
 import {computed, ref, onBeforeMount, onMounted} from "vue";
 import {onPageScroll} from "@dcloudio/uni-app";
 import _ from "lodash";
