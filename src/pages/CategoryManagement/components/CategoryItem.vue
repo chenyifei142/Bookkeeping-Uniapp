@@ -21,7 +21,7 @@
           <div class="category-details">
             <div class="category-name">{{ category.name }}</div>
             <div class="category-stats">
-              {{ category?.children?.length }}个子分类
+              {{ category?.children?.length ?? 0 }}个子分类
             </div>
           </div>
         </div>
@@ -73,9 +73,8 @@
  * 分类项组件
  * 展示单个分类项及其子分类，支持拖拽排序
  */
-import {defineProps, defineEmits} from 'vue'
 import {jumpPage} from '@/utils'
-import {Category, Subcategory} from '../types'
+import type {Category, Subcategory} from '../types'
 
 const props = defineProps({
   // 分类数据
@@ -148,7 +147,7 @@ const editSubcategory = (subcategory: Subcategory) => {
 /**
  * 跳转到详情页
  */
-const navigateToDetails = (category) => {
+const navigateToDetails = (category: Category) => {
   jumpPage('pages/CategoryManagement/details', {id: category.id})
 }
 

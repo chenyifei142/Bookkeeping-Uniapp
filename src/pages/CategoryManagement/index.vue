@@ -57,7 +57,7 @@ import {
   editBillType,
   saveBillType
 } from "@/api/CategoryManagement"
-import {
+import type {
   Category,
   Subcategory,
   SubcategoryFormData

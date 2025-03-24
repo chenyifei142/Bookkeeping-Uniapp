@@ -7,7 +7,7 @@ export interface Subcategory {
     id: number;
     name: string;
     icon: string;
-    bgColor?: string;
+    bgColor: string;
     parentId?: number;
     sort?: number;
 }
@@ -17,7 +17,7 @@ export interface Category {
     id: number;
     name: string;
     icon: string;
-    bgColor?: string;
+    bgColor: string;
     expanded?: boolean;
     quickNotes?: number;
     children: Subcategory[];

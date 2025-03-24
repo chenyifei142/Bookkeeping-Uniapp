@@ -17,7 +17,6 @@
  * 分类管理页面顶部标题与操作区组件
  * 包含页面标题和添加、排序按钮
  */
-import { defineProps, defineEmits } from 'vue'
 
 const props = defineProps({
   isSortMode: {
@@ -78,4 +77,4 @@ const handleToggleSort = () => {
 .sort-button:active {
   background-color: #C5CBD5;
 }
-</style> 
+</style>

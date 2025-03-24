@@ -66,6 +66,7 @@
 <script lang="ts" setup>
 import {ref, watch, onMounted, computed} from 'vue'
 import emojisData from '@/static/json/emojis.json'
+import type { Category, Subcategory } from '@/pages/CategoryManagement/types'
 
 // 为emojisData定义类型
 interface EmojiItem {
@@ -81,23 +82,6 @@ interface EmojisData {
   '@copyright'?: string;
   '@see'?: string;
   '@license'?: string;
-}
-
-// 定义类型
-interface Subcategory {
-  icon: string;
-  name: string;
-}
-
-interface Category {
-  id: number;
-  name: string;
-  icon: string;
-  bgColor: string;
-  expanded: boolean;
-  quickNotes: number;
-  children: Subcategory[];
-  note?: string;
 }
 
 // 定义组件的props

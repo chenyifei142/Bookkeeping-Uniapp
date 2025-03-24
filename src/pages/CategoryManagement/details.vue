@@ -10,25 +10,17 @@
           </div>
         </div>
         <div class="category-name">{{ category.name || '加载中...' }}</div>
-        <div class="category-stats">{{ category.children?.length || 0 }}个子分类，{{ category.quickNotes || 0 }}条快捷备注</div>
+        <div class="category-stats">{{ category.children?.length || 0 }}个子分类</div>
 
         <div class="action-buttons">
-          <button class="action-button edit-button" @click="showEditCategory">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-            </svg>
+          <div class="action-button" @click="showEditCategory">
+            <up-icon name="edit-pen" color="#5E5C5D" size="28"></up-icon>
             编辑
-          </button>
-          <button class="action-button delete-button" @click="confirmDeleteCategory">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                 stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
+          </div>
+          <div class="action-button" @click="confirmDeleteCategory">
+            <up-icon name="trash" color="#C33C36" size="28"></up-icon>
             删除
-          </button>
+          </div>
         </div>
       </div>
 
@@ -36,64 +28,39 @@
       <div class="section">
         <div class="section-header">
           <div class="section-title">子分类</div>
-          <button class="sort-button" @click="toggleSortMode">{{ isSortMode ? '完成' : '排序' }}</button>
+          <div class="sort-button" @click="toggleSortMode">{{ isSortMode ? '完成' : '排序' }}</div>
         </div>
 
         <div
-          class="subcategories"
-          :class="{ 'sorting-mode': isSortMode }"
+            class="subcategories"
+            :class="{ 'sorting-mode': isSortMode }"
         >
           <div class="subcategory-item add-item" @click="addSubcategory" v-if="!isSortMode">
             <div class="subcategory-icon add-icon">
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
+              <up-icon name="plus" color="#5E5C5D" size="28"></up-icon>
             </div>
             <div class="subcategory-name">添加</div>
           </div>
 
           <div
-            v-for="(sub, index) in category.children"
-            :key="sub.id"
-            class="subcategory-item"
-            :class="{ 'dragging': currentIndex === index && isDragging }"
-            :style="{
+              v-for="(sub, index) in category.children"
+              :key="sub.id"
+              class="subcategory-item"
+              :class="{ 'dragging': currentIndex === index && isDragging }"
+              :style="{
               transform: currentIndex === index ? `translate(${currentX - startX}px, ${currentY - startY}px)` : 'none',
               transition: currentIndex === index && isDragging ? 'none' : 'transform 0.2s ease',
               position: currentIndex === index ? 'relative' : 'static',
               zIndex: currentIndex === index ? 999 : 1
             }"
-            @touchstart="isSortMode ? handleTouchStart($event, index) : null"
-            @touchmove="isSortMode ? handleTouchMove($event, index) : null"
-            @touchend="isSortMode ? handleTouchEnd(index) : null"
-            @click="!isSortMode ? editSubcategory(sub) : null"
+              @touchstart="isSortMode ? handleTouchStart($event, index) : null"
+              @touchmove="isSortMode ? handleTouchMove($event, index) : null"
+              @touchend="isSortMode ? handleTouchEnd(index) : null"
+              @click="!isSortMode ? editSubcategory(sub) : null"
           >
             <div class="subcategory-icon" :style="{ backgroundColor: sub.bgColor || '#f5f5f5' }">{{ sub.icon }}</div>
             <div class="subcategory-name">{{ sub.name }}</div>
-            <div v-if="isSortMode" class="drag-handle">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none"
-                   stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="8" y1="6" x2="21" y2="6"></line>
-                <line x1="8" y1="12" x2="21" y2="12"></line>
-                <line x1="8" y1="18" x2="21" y2="18"></line>
-                <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                <line x1="3" y1="18" x2="3.01" y2="18"></line>
-              </svg>
-            </div>
           </div>
-        </div>
-      </div>
-
-      <!-- 分类备注信息 -->
-      <div class="section" v-if="category.note">
-        <div class="section-header">
-          <div class="section-title">备注</div>
-        </div>
-        <div class="note-content">
-          {{ category.note }}
         </div>
       </div>
 
@@ -106,20 +73,20 @@
 
   <!-- 编辑分类/子分类弹窗 -->
   <subcategory-editor
-    :show="showModal"
-    :is-editing="isEditing"
-    :category-data="category"
-    :subcategory-data="selectedSubcategory"
-    @update:show="showModal = $event"
-    @save="handleSaveSubcategory"
-    @delete="handleDeleteSubcategory"
+      :show="showModal"
+      :is-editing="isEditing"
+      :category-data="category"
+      :subcategory-data="selectedSubcategory"
+      @update:show="showModal = $event"
+      @save="handleSaveSubcategory"
+      @delete="handleDeleteSubcategory"
   />
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, onMounted, nextTick } from 'vue'
-import { onLoad } from "@dcloudio/uni-app"
-import { getQuery, jumpPage, showToast } from "@/utils"
+import {ref, reactive, onMounted, nextTick} from 'vue'
+import {onLoad} from "@dcloudio/uni-app"
+import {getQuery, jumpPage, showToast} from "@/utils"
 import {
   getBillTypeById,
   saveBillType,
@@ -128,7 +95,7 @@ import {
   dragSortBillType
 } from "@/api/CategoryManagement"
 import SubcategoryEditor from '@/components/subcategoryEditor/index.vue'
-import {
+import type {
   Category,
   Subcategory,
   SubcategoryFormData
@@ -139,7 +106,7 @@ const categoryId = ref<string | null>(null)
 
 // 页面加载
 onLoad((option) => {
-  const { id } = getQuery(option)
+  const {id} = getQuery(option)
   categoryId.value = id
   getDetails(id)
 })
@@ -158,7 +125,7 @@ const category = reactive<Category>({
 // 获取分类详情
 const getDetails = async (id: string | number) => {
   try {
-    const { data } = await getBillTypeById({ id })
+    const {data} = await getBillTypeById({id})
     if (data) {
       Object.assign(category, data)
     } else {
@@ -187,7 +154,7 @@ const startY = ref(0)
 const currentX = ref(0)
 const currentY = ref(0)
 const initialOrder = ref<Subcategory[]>([]) // 存储初始顺序
-const itemSize = ref({ width: 75, height: 85 }) // 子分类项的大小（包括间距）
+const itemSize = ref({width: 75, height: 85}) // 子分类项的大小（包括间距）
 
 // 返回分类列表
 const goBack = () => {
@@ -246,7 +213,7 @@ const handleSaveSubcategory = async (data: SubcategoryFormData) => {
     if (res && res.msg) {
       showToast(res.msg)
     }
-    
+
     // 重新获取分类详情
     await getDetails(categoryId.value as string)
   } catch (error) {
@@ -260,7 +227,7 @@ const handleDeleteSubcategory = async () => {
   try {
     if (selectedSubcategory.value) {
       // 删除子分类
-      const res = await deleteBillType({ id: selectedSubcategory.value.id })
+      const res = await deleteBillType({id: selectedSubcategory.value.id})
       if (res && res.msg) {
         showToast(res.msg)
       }
@@ -289,7 +256,7 @@ const confirmDeleteCategory = () => {
 // 删除父分类
 const deleteCategory = async () => {
   try {
-    const res = await deleteBillType({ id: category.id })
+    const res = await deleteBillType({id: category.id})
     if (res && res.msg) {
       showToast(res.msg)
     }
@@ -329,12 +296,12 @@ const saveCategoryOrder = async () => {
       ...subcategory,
       sort: index
     }))
-    
+
     const res = await dragSortBillType(data)
     if (res && res.msg) {
       showToast(res.msg)
     }
-    
+
     // 重新获取分类详情
     await getDetails(categoryId.value as string)
   } catch (error) {
@@ -374,7 +341,7 @@ const handleTouchMove = (e: TouchEvent, index: number) => {
   // 更新当前位置
   currentX.value = e.touches[0].clientX
   currentY.value = e.touches[0].clientY
-  
+
   // 计算移动距离
   const moveX = currentX.value - startX.value
   const moveY = currentY.value - startY.value
@@ -397,40 +364,40 @@ const checkForPositionExchange = (currentIdx: number, moveX: number, moveY: numb
     x: moveX > 0 ? 1 : moveX < 0 ? -1 : 0,
     y: moveY > 0 ? 1 : moveY < 0 ? -1 : 0
   }
-  
+
   // 计算每行显示的子分类数量（假设容器宽度为屏幕宽度）
   // 这里简单估计每行显示4个子分类
   const itemsPerRow = 4
-  
+
   // 计算目标索引
   let targetIndex = currentIdx
-  
+
   // 计算水平和垂直移动的个数
   const absX = Math.abs(moveX)
   const absY = Math.abs(moveY)
-  
+
   // 如果水平移动距离足够大
   if (absX >= itemSize.value.width * 0.6) {
     const moveCount = Math.floor(absX / itemSize.value.width)
     targetIndex += direction.x * moveCount
   }
-  
+
   // 如果垂直移动距离足够大
   if (absY >= itemSize.value.height * 0.6) {
     const moveCount = Math.floor(absY / itemSize.value.height)
     targetIndex += direction.y * moveCount * itemsPerRow
   }
-  
+
   // 确保目标索引在有效范围内
   targetIndex = Math.max(0, Math.min(category.children.length - 1, targetIndex))
-  
+
   // 如果目标索引不同，交换位置
   if (targetIndex !== currentIdx) {
     swapSubcategoryPositions(currentIdx, targetIndex)
-    
+
     // 更新当前索引
     currentIndex.value = targetIndex
-    
+
     // 更新拖动起始位置
     startX.value = currentX.value - (moveX % itemSize.value.width) * direction.x
     startY.value = currentY.value - (moveY % itemSize.value.height) * direction.y
@@ -456,11 +423,9 @@ const handleTouchEnd = (index: number) => {
 
 <style scoped>
 .category-detail-page {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-  max-width: 414px;
   margin: 0 auto;
   min-height: 100vh;
-  background-color: #f8f8f8;
+  background-color: #FFFFFF;
   color: #333;
   position: relative;
 }
@@ -531,24 +496,8 @@ const handleTouchEnd = (index: number) => {
   opacity: 0.8;
 }
 
-.edit-button {
-  background-color: #E0F7FA;
-  color: #00ACC1;
-}
-
-.delete-button {
-  background-color: #FFEBEE;
-  color: #F44336;
-}
-
-.action-button svg {
-  width: 16px;
-  height: 16px;
-}
-
 /* 部分标题样式 */
 .section {
-  background-color: #fff;
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
@@ -559,24 +508,21 @@ const handleTouchEnd = (index: number) => {
   justify-content: space-between;
   align-items: center;
   padding: 15px;
-  border-bottom: 1px solid #f0f0f0;
 }
 
 .section-title {
   font-size: 16px;
-  font-weight: 500;
   color: #333;
+  font-weight: 600;
 }
 
 .sort-button {
-  font-size: 14px;
-  color: #00ACC1;
-  background: none;
-  border: none;
+  padding: 8px 15px;
+  background-color: #DEE2EB;
+  border-radius: 10px;
   cursor: pointer;
-  padding: 4px 12px;
-  border-radius: 15px;
-  transition: background-color 0.2s;
+  transition: all 0.3s ease;
+  font-size: 14px;
 }
 
 .sort-button:active {
@@ -591,8 +537,9 @@ const handleTouchEnd = (index: number) => {
   overflow-x: auto;
   flex-wrap: wrap;
   min-height: 90px;
-  scrollbar-width: none; /* Firefox */
   position: relative;
+  background-color: #F5F5F5;
+  border-radius: 15px;
 }
 
 .subcategories::-webkit-scrollbar {
