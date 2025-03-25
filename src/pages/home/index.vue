@@ -114,6 +114,14 @@ const formatMonthRange = computed(() => {
   return formatMonthRangeUtil(selectedYear.value, selectedMonth.value);
 })
 
+// 格式化金额显示
+const formattedMonthlyExpense = computed(() => {
+  const num = monthlyExpense.value;
+  const parts = num.toString().split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
+})
+
 onShow(() => {
   // 初始化当前月份
   currentMonth.value = formatCurrentMonth();
@@ -151,7 +159,7 @@ onShow(() => {
               </div>
               <div class="card-title">支出</div>
             </div>
-            <div class="card-amount">¥{{ monthlyExpense }}</div>
+            <div class="card-amount">¥{{ formattedMonthlyExpense }}</div>
           </div>
           <div class="summary-card income">
             <div class="card-header">
@@ -183,7 +191,8 @@ onShow(() => {
                   </div>
                   <div class="item-info">
                     <div class="item-category">{{ item.BillType.name }}</div>
-                    <div class="item-time">{{ item.remark || item.consumptionTime.substring(10, 16) }}</div>
+                    <div class="item-time">{{ item.consumptionTime.substring(10, 16) }}</div>
+                    <div class="item-time" v-if="item.remark">{{ item.remark}}</div>
                   </div>
                 </div>
                 <div class="item-amount font-bold" :class="{ 'expense': item.type === 'expense' }">
@@ -344,7 +353,7 @@ onShow(() => {
 }
 
 .item-time {
-  font-size: 14px;
+  font-size: 12px;
   color: #999;
   margin-top: 4px;
 }
