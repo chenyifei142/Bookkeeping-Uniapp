@@ -2,7 +2,7 @@
 import {backPage, jumpPage, showToast} from "@/utils";
 import {computed, ref, onBeforeMount, onMounted} from "vue";
 import {onPageScroll} from "@dcloudio/uni-app";
-import _ from "lodash";
+import _, { round } from "lodash";
 import {getBillTypeList, saveBillRecord} from "@/api/billRecord";
 import DatePicker from "@/components/datePicker/index.vue";
 
@@ -16,6 +16,7 @@ type BillType = {
   id: number;
   name: string;
   icon: string;
+  children?: BillType[];
 };
 
 // ====================== 布局与UI相关状态 ======================
@@ -26,6 +27,8 @@ const touchStartX = ref(0)
 const pagesContainer = ref(null)
 const showDatePicker = ref(false);
 const selectedDate = ref(new Date());
+const showSubCategoryPicker = ref(false);
+const currentParentCategory = ref<BillType | null>(null);
 
 // 备注相关状态
 const remark = ref(''); // 备注内容
@@ -61,7 +64,7 @@ const handleDateConfirm = (date: Date) => {
 };
 
 // ====================== 分类相关状态与方法 ======================
-const selectedCategory = ref<Partial<BillType>>({id: undefined, name: '', icon: ''})
+const selectedCategory = ref<Partial<BillType & { parentCategory?: BillType }>>({id: undefined, name: '', icon: ''})
 const allCategories = ref<BillType[]>([])
 const manageCategoryItem = {id: 114514, name: '管理分类', icon: 'icon'}
 
@@ -89,12 +92,38 @@ const categoryPages = computed(() => {
   return pages
 })
 
-const handleSelectedCategory = (category: any) => {
+const handleSelectedCategory = (category: BillType) => {
   if (category.id === 114514) {
     jumpPage('pages/CategoryManagement/index')
     return;
   }
-  selectedCategory.value = category
+
+  // 如果有子分类，显示子分类选择弹窗
+  if (category.children && category.children.length > 0) {
+    currentParentCategory.value = category;
+    showSubCategoryPicker.value = true;
+    return;
+  }
+
+  // 没有子分类，直接选择
+  selectedCategory.value = category;
+}
+
+// 处理子分类选择
+const handleSubCategorySelect = (subCategory: BillType) => {
+  // 保存子类信息和父类信息
+  selectedCategory.value = {
+    ...subCategory,
+    parentCategory: currentParentCategory.value || undefined
+  };
+  showSubCategoryPicker.value = false;
+  currentParentCategory.value = null;
+}
+
+// 关闭子分类选择弹窗
+const closeSubCategoryPicker = () => {
+  showSubCategoryPicker.value = false;
+  currentParentCategory.value = null;
 }
 
 // ====================== 计算器状态与方法 ======================
@@ -541,11 +570,19 @@ onMounted(() => {
                  @click="handleSelectedCategory(category)"
                  class="category-item">
               <div class="icon-wrapper"
-                   :class="['icon-wrapper', selectedCategory.id === category.id ? 'active' : '']">
+                   :class="[
+                     selectedCategory.id === category.id ||
+                     selectedCategory.parentCategory?.id === category.id ?
+                     'active' : ''
+                   ]">
                 <span class="category-icon">{{ category.icon }}</span>
               </div>
               <span class="category-name"
-                    :class="[selectedCategory.id === category.id ? 'active' : '']">
+                    :class="[
+                      selectedCategory.id === category.id ||
+                      selectedCategory.parentCategory?.id === category.id ?
+                      'active' : ''
+                    ]">
                 {{ category.name }}
               </span>
             </div>
@@ -558,11 +595,19 @@ onMounted(() => {
                  @click="handleSelectedCategory(category)"
                  class="category-item">
               <div class="icon-wrapper"
-                   :class="['icon-wrapper', selectedCategory.id === category.id ? 'active' : '']">
+                   :class="[
+                     selectedCategory.id === category.id ||
+                     selectedCategory.parentCategory?.id === category.id ?
+                     'active' : ''
+                   ]">
                 <span class="category-icon">{{ category.icon }}</span>
               </div>
               <div class="category-name"
-                   :class="[selectedCategory.id === category.id ? 'active' : '']">
+                   :class="[
+                     selectedCategory.id === category.id ||
+                     selectedCategory.parentCategory?.id === category.id ?
+                     'active' : ''
+                   ]">
                 {{ category.name }}
               </div>
             </div>
@@ -590,7 +635,13 @@ onMounted(() => {
           <div class="card-icon">
             <span class="emoji">{{ selectedCategory.icon || '🤖' }}</span>
           </div>
-          <div class="card-title">{{ selectedCategory.name || '未选择' }}</div>
+          <div class="card-title">
+            <template v-if="selectedCategory.parentCategory">
+              <span >{{ selectedCategory.parentCategory.name }}</span>
+              <span class="category-separator"> - </span>
+            </template>
+            <span class="parent-category">{{ selectedCategory.name|| '未选择' }}</span>
+          </div>
         </div>
         <div class="card-amount">¥{{ displayAmount }}</div>
       </div>
@@ -618,6 +669,10 @@ onMounted(() => {
                  cursor-spacing="20"/>
         </div>
       </div>
+    </div>
+
+    <div>
+
     </div>
 
     <!-- 键盘区域 -->
@@ -666,6 +721,33 @@ onMounted(() => {
               :value="selectedDate"
               @update:show="showDatePicker = $event"
               @confirm="handleDateConfirm"/>
+
+  <!-- 子分类选择弹窗 -->
+  <u-popup :show="showSubCategoryPicker" mode="bottom" @close="closeSubCategoryPicker" :round="20">
+    <div class="sub-category-picker">
+      <div class="sub-category-header">
+        <div class="sub-category-title">选择子分类</div>
+        <div class="sub-category-close" @click="closeSubCategoryPicker">
+          <u-icon name="close" size="20" color="#666"></u-icon>
+        </div>
+      </div>
+      <div class="sub-category-content">
+        <div v-if="currentParentCategory" class="parent-category-info">
+          <span class="parent-category-icon">{{ currentParentCategory.icon }}</span>
+          <span class="parent-category-name">{{ currentParentCategory.name }}</span>
+        </div>
+        <div class="sub-category-grid">
+          <div v-for="subCategory in currentParentCategory?.children"
+               :key="subCategory.id"
+               class="sub-category-item"
+               @click="handleSubCategorySelect(subCategory)">
+            <div class="sub-category-icon">{{ subCategory.icon }}</div>
+            <div class="sub-category-name">{{ subCategory.name }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </u-popup>
 </template>
 
 <style scoped>
@@ -1050,5 +1132,100 @@ onMounted(() => {
 .action-btn.secondary {
   background-color: #C3EAE5;
   color: #183C3A;
+}
+
+/* 子分类选择弹窗样式 */
+.sub-category-picker {
+  background-color: #fff;
+  border-radius: 20px 20px 0 0;
+  padding: 20px;
+  height: 750rpx; /* 修改为与keypad-container相同的高度 */
+  overflow-y: auto;
+}
+
+.sub-category-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.sub-category-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #333;
+}
+
+.sub-category-close {
+  padding: 5px;
+}
+
+.parent-category-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  margin-bottom: 15px;
+}
+
+.parent-category-icon {
+  font-size: 24px;
+}
+
+.parent-category-name {
+  font-size: 16px;
+  color: #666;
+}
+
+.sub-category-content {
+  height: calc(100% - 60px); /* 减去header的高度 */
+  overflow-y: auto;
+}
+
+.sub-category-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 15px;
+  padding-bottom: 20px; /* 添加底部内边距，确保最后一个项目可以完全显示 */
+}
+
+.sub-category-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.sub-category-item:active {
+  background-color: #e0e0e0;
+}
+
+.sub-category-icon {
+  font-size: 24px;
+}
+
+.sub-category-name {
+  font-size: 14px;
+  color: #333;
+  text-align: center;
+}
+
+/* 父类-子类组合显示样式 */
+.parent-category {
+  font-size: 14px;
+  color: #888;
+}
+
+.category-separator {
+  font-size: 14px;
+  color: #999;
+  margin: 0 2px;
 }
 </style>
