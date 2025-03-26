@@ -16,64 +16,53 @@ import {
   formatMonthRange as formatMonthRangeUtil
 } from '@/utils/date';
 
+/**
+ * 数据状态和响应式变量
+ */
 // 页面滚动状态
 const toggle = ref(false)
 
 // 账单列表数据
 const billList = ref<any[]>([])
 const currentDayTotal = ref(0)
-const pageParams = reactive<any>({
-  startTime: '',
-  endTime: ''
-})
 const loading = ref(false)
 const hasMore = ref(true)
-
-// 获取账单列表
-const getBillRecords = async () => {
-  if (loading.value || !hasMore.value) return
-  loading.value = true
-
-  try {
-    const res = await getBillRecordList(pageParams)
-    if (res.code === 0) {
-      billList.value = res.data
-    }
-  } catch (error) {
-    console.error('获取账单列表失败：', error)
-  } finally {
-    loading.value = false
-  }
-}
-
-// 月度数据
-const currentMonth = ref('')
-const monthlyExpense = ref(0)
-const monthlyBudget = ref(0)
-
-// 获取月度支出
-const getMonthlyExpense = async () => {
-  try {
-    const res = await getTotalExpenseMonthly(currentMonth.value)
-    if (res.code === 0) {
-      monthlyExpense.value = res?.data?.total || 0
-      monthlyBudget.value = res?.data?.balance || 0
-    }
-  } catch (error) {
-    console.error('获取月度支出失败：', error)
-  }
-}
 
 // 月份选择相关状态
 const showMonthPicker = ref(false)
 const selectedYear = ref(new Date().getFullYear())
 const selectedMonth = ref(new Date().getMonth() + 1)
 
-// 打开月份选择器
-const openMonthPicker = () => {
-  showMonthPicker.value = true
-}
+// 月度数据
+const currentMonth = ref('')
+const monthlyExpense = ref(0)
+const monthlyBudget = ref(0)
 
+// 页面请求参数
+const pageParams = reactive<any>({
+  startTime: '',
+  endTime: ''
+})
+
+/**
+ * 计算属性
+ */
+// 格式化显示月份范围
+const formatMonthRange = computed(() => {
+  return formatMonthRangeUtil(selectedYear.value, selectedMonth.value);
+})
+
+// 格式化金额显示
+const formattedMonthlyExpense = computed(() => {
+  const num = monthlyExpense.value;
+  const parts = num.toString().split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
+})
+
+/**
+ * 方法
+ */
 // 设置月份开始和结束时间
 const setMonthTimeRange = (year: number, month: number) => {
   // 月份开始日期
@@ -93,6 +82,11 @@ const setMonthTimeRange = (year: number, month: number) => {
   pageParams.endTime = formatDate(endDate);
 };
 
+// 打开月份选择器
+const openMonthPicker = () => {
+  showMonthPicker.value = true
+}
+
 // 处理月份选择
 const handleMonthSelect = (data: { year: number, month: number }) => {
   selectedYear.value = data.year;
@@ -105,23 +99,51 @@ const handleMonthSelect = (data: { year: number, month: number }) => {
   setMonthTimeRange(data.year, data.month);
 
   // 重新获取数据
-  getMonthlyExpense();
-  getBillRecords();
+  refreshData();
 }
 
-// 格式化显示月份范围
-const formatMonthRange = computed(() => {
-  return formatMonthRangeUtil(selectedYear.value, selectedMonth.value);
-})
+/**
+ * API请求
+ */
+// 获取账单列表
+const getBillRecords = async () => {
+  if (loading.value || !hasMore.value) return
+  loading.value = true
 
-// 格式化金额显示
-const formattedMonthlyExpense = computed(() => {
-  const num = monthlyExpense.value;
-  const parts = num.toString().split('.');
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return parts.join('.');
-})
+  try {
+    const res = await getBillRecordList(pageParams)
+    if (res.code === 0) {
+      billList.value = res.data
+    }
+  } catch (error) {
+    console.error('获取账单列表失败：', error)
+  } finally {
+    loading.value = false
+  }
+}
 
+// 获取月度支出
+const getMonthlyExpense = async () => {
+  try {
+    const res = await getTotalExpenseMonthly(currentMonth.value)
+    if (res.code === 0) {
+      monthlyExpense.value = res?.data?.total || 0
+      monthlyBudget.value = res?.data?.balance || 0
+    }
+  } catch (error) {
+    console.error('获取月度支出失败：', error)
+  }
+}
+
+// 刷新所有数据
+const refreshData = () => {
+  getBillRecords();
+  getMonthlyExpense();
+}
+
+/**
+ * 生命周期钩子
+ */
 onShow(() => {
   // 初始化当前月份
   currentMonth.value = formatCurrentMonth();
@@ -130,14 +152,14 @@ onShow(() => {
   setMonthTimeRange(selectedYear.value, selectedMonth.value);
 
   // 获取数据
-  getBillRecords()
-  getMonthlyExpense()
+  refreshData();
 })
 </script>
 
 <template>
   <basic-layout>
     <default-home-page :is-other-high="15" @update:toggle="toggle = $event">
+      <!-- 顶部标题栏 -->
       <template #title>
         <div class="flex-center" style="height: 100%">
           <div class="calendar-icon" style="position: absolute;left: 10px" @click="openMonthPicker">
@@ -149,9 +171,11 @@ onShow(() => {
           </div>
         </div>
       </template>
+      
+      <!-- 收支统计卡片 -->
       <template #banner>
-        <!-- 收支统计 -->
         <div class="summary-cards card-container">
+          <!-- 支出卡片 -->
           <div class="summary-card expense">
             <div class="card-header">
               <div class="card-icon">
@@ -161,6 +185,8 @@ onShow(() => {
             </div>
             <div class="card-amount">¥{{ formattedMonthlyExpense }}</div>
           </div>
+          
+          <!-- 收入卡片 -->
           <div class="summary-card income">
             <div class="card-header">
               <div class="card-icon">
@@ -172,10 +198,14 @@ onShow(() => {
           </div>
         </div>
       </template>
+      
+      <!-- 交易记录列表 -->
       <template #content>
-        <!-- 交易记录列表 -->
-        <div class="transactions ">
-          <div v-for="(group, index) in billList" :key="index" class="transaction-group">
+        <div class="transactions">
+          <div v-for="(group, index) in billList" 
+               :key="index" 
+               class="transaction-group">
+            <!-- 日期头部 -->
             <div class="date-header">
               <div class="date">{{ formatDateDisplay(group.consumptionDate) }}</div>
               <div class="daily-summary">
@@ -183,8 +213,12 @@ onShow(() => {
                 <span class="num">¥{{ group.total }}</span>
               </div>
             </div>
+            
+            <!-- 交易项目列表 -->
             <div class="transaction-items">
-              <div v-for="item in group.Data" :key="item.ID" class="transaction-item">
+              <div v-for="item in group.Data" 
+                   :key="item.ID" 
+                   class="transaction-item">
                 <div class="item-left">
                   <div class="item-icon" :style="{ backgroundColor: item.iconBg }">
                     <span class="emoji">{{ item.BillType.icon }}</span>
@@ -206,7 +240,7 @@ onShow(() => {
     </default-home-page>
   </basic-layout>
 
-  <!-- 使用月份选择器组件 -->
+  <!-- 月份选择器组件 -->
   <month-picker
       v-model:show="showMonthPicker"
       :selected-year="selectedYear"
@@ -214,6 +248,7 @@ onShow(() => {
       @select-month="handleMonthSelect"
   />
 
+  <!-- 添加记录按钮 -->
   <div class="float-action-button icon-add-circle flex-center gap-10"
        @click="jumpPage('pages/home/components/addBillRecord')"
        v-show="true"

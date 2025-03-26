@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import {backPage, jumpPage, showToast} from "@/utils";
-import {computed, ref, onBeforeMount, onMounted} from "vue";
+import {computed, ref, onBeforeMount, nextTick} from "vue";
 import {onPageScroll, onShow} from "@dcloudio/uni-app";
-import _, {round} from "lodash";
+import _ from "lodash";
 import {getBillTypeList, saveBillRecord} from "@/api/billRecord";
 import DatePicker from "@/components/datePicker/index.vue";
 import SubcategoryEditor from "@/components/subcategoryEditor/index.vue";
 import type {Category, Subcategory, SubcategoryFormData} from '@/pages/CategoryManagement/types';
 import {saveBillType} from '@/api/CategoryManagement';
+import CalculatorKeypad from '@/pages/home/components/CalculatorKeypad.vue';
 
 // ====================== 类型定义 ======================
 type MenuBtnRectType = {
@@ -43,8 +44,10 @@ const currentParentCategory = ref<BillType | null>(null);
 const remark = ref(''); // 备注内容
 const showRemarkInput = ref(false); // 是否显示备注输入框
 
-// 页面滚动监听
-onPageScroll(_.debounce((options: any) => toggle.value = options.scrollTop > 200, 100))
+// 页面滚动监听 - 使用节流而非防抖，提高响应性
+onPageScroll(_.throttle((options: any) => {
+  toggle.value = options.scrollTop > 200
+}, 50))
 
 // 获取日期格式化显示
 const formattedDate = computed(() => {
@@ -62,14 +65,8 @@ const formattedConsumptionDate = computed(() => {
 
 // 处理日期选择确认
 const handleDateConfirm = (date: Date) => {
-  console.log('接收到的日期:', date.toLocaleString());
-  // 创建一个新的日期对象，确保Vue能检测到变化
   selectedDate.value = new Date(date);
   showDatePicker.value = false;
-
-  // 调试输出
-  console.log('更新后的日期:', selectedDate.value.toLocaleString());
-  console.log('格式化后的日期:', formattedDate.value);
 };
 
 // ====================== 分类相关状态与方法 ======================
@@ -90,6 +87,9 @@ const getTypeList = async () => {
 
 // 将分类分成每页最多10个（5个一行，共2行）
 const categoryPages = computed(() => {
+  // 使用空数组和早期退出策略优化性能
+  if (!allCategories.value.length) return [];
+  
   const pages: BillType[][] = []
   // 创建新数组，避免修改原数组
   const categories = [...allCategories.value, manageCategoryItem]
@@ -140,300 +140,21 @@ const closeSubCategoryPicker = () => {
 }
 
 // ====================== 计算器状态与方法 ======================
-// 基础状态
-const amount = ref('0')                      // 当前输入的数字
-const displayExpression = ref('')            // 显示的表达式
-const isCalculating = ref(false)             // 是否正在计算中
-const operationHistory = ref<string[]>([])   // 操作历史记录
-const currentOperation = ref('')             // 当前运算符（+/-）
-const previousAmount = ref('0')             // 第一个操作数
-const waitingForSecondOperand = ref(false)  // 是否等待第二个操作数输入
-const hasStartedSecondOperand = ref(false)  // 是否已开始输入第二个操作数
-
-// 长按删除相关变量
-const deleteTimer = ref<number | null>(null)
-const isLongPressing = ref(false)
-
-// 显示的金额或表达式
-const displayAmount = computed(() => {
-  // 如果有表达式，优先显示表达式
-  if (displayExpression.value) {
-    return displayExpression.value;
-  }
-
-  // 如果正在等待第二个操作数但还没开始输入
-  if (waitingForSecondOperand.value && !hasStartedSecondOperand.value) {
-    return previousAmount.value;
-  }
-  console.log(amount.value, "amount.value")
-  return amount.value;
-})
-
-/**
- * 更新显示的计算表达式
- * 格式：第一个操作数 运算符 第二个操作数
- */
-const updateDisplayExpression = () => {
-  if (currentOperation.value && previousAmount.value) {
-    displayExpression.value = `${previousAmount.value} ${currentOperation.value} ${hasStartedSecondOperand.value ? amount.value : ''}`;
-  } else {
-    displayExpression.value = '';
-  }
-}
-
-/**
- * 格式化数字，去除多余的小数点和零
- * @param num 需要格式化的数字
- * @returns 格式化后的数字字符串
- */
-const formatNumber = (num: number): string => {
-  // 转换为字符串并最多保留两位小数
-  let str = parseFloat(num.toFixed(2)).toString();
-
-  // 如果是整数，不显示小数点
-  if (str.indexOf('.') > 0) {
-    // 去除末尾的0
-    str = str.replace(/0+$/, '');
-    // 如果小数点后没有数字，去除小数点
-    str = str.replace(/\.$/, '');
-  }
-
-  return str;
-}
-
-/**
- * 计算结果
- * 执行加减法运算并更新状态
- */
-const calculateResult = () => {
-  if (!currentOperation.value) return;
-
-  const prev = parseFloat(previousAmount.value);
-  const current = parseFloat(amount.value);
-  let result = 0;
-
-  switch (currentOperation.value) {
-    case '+':
-      result = prev + current;
-      break;
-    case '-':
-      result = prev - current;
-      break;
-  }
-
-  // 格式化结果，最多保留两位小数
-  amount.value = formatNumber(result);
-  previousAmount.value = amount.value;
-  currentOperation.value = '';
-  displayExpression.value = '';
-  isCalculating.value = false;
-  waitingForSecondOperand.value = false;
-  hasStartedSecondOperand.value = false;
-}
-
-/**
- * 清空所有数字
- * 重置计算器状态
- */
-const clearAllNumbers = () => {
-  amount.value = '0'
-  currentOperation.value = ''
-  displayExpression.value = ''
-  previousAmount.value = '0'
-  waitingForSecondOperand.value = false
-  hasStartedSecondOperand.value = false
-  isCalculating.value = false
-}
-
-/**
- * 处理数字点击
- * @param num 点击的数字或小数点
- */
-const handleNumberClick = (num: string) => {
-  if (num === 'x') {
-    handleDelete()
-    return;
-  }
-  // uni.vibrateShort({
-  //   success: function () {
-  //     console.log('success');
-  //   }
-  // });
-
-  // 如果等待第二个操作数，且当前输入的是第一个数字
-  if (waitingForSecondOperand.value) {
-    if (!hasStartedSecondOperand.value) {
-      amount.value = '0';
-      hasStartedSecondOperand.value = true;
-    }
-  }
-
-  if (amount.value === '0' && num !== '.') {
-    amount.value = num;
-  } else {
-    // 防止多个小数点
-    if (num === '.' && amount.value.includes('.')) return;
-    amount.value += num;
-  }
-
-  // 如果正在计算中且已开始输入第二个操作数，更新表达式显示
-  if (isCalculating.value && hasStartedSecondOperand.value) {
-    updateDisplayExpression();
-  }
-}
-
-/**
- * 执行通用的运算符操作
- * @param operator 运算符 (+ 或 -)
- */
-const handleOperator = (operator: string) => {
-  // 触觉反馈
-  uni.vibrateShort({
-    success: () => {
-    }
-  })
-
-  // 如果已经有未完成的操作，先计算结果
-  if (currentOperation.value && hasStartedSecondOperand.value) {
-    calculateResult()
-  }
-
-  // 保存当前值和操作
-  previousAmount.value = amount.value
-  currentOperation.value = operator
-  waitingForSecondOperand.value = true
-  hasStartedSecondOperand.value = false // 重置标志，表示还没开始输入第二个操作数
-  isCalculating.value = true
-
-  // 立即更新显示表达式，显示运算符
-  updateDisplayExpression()
-}
-
-/**
- * 处理加法操作
- */
-const handlePlus = () => handleOperator('+')
-
-/**
- * 处理减法操作
- */
-const handleMinus = () => handleOperator('-')
-
-/**
- * 处理删除操作
- * 按照三阶段逐步删除：
- * 1. 先删除第二个操作数
- * 2. 再删除运算符
- * 3. 最后逐位删除第一个操作数
- */
-const handleDelete = () => {
-  // 触觉反馈
-  uni.vibrateShort({
-    success: () => {
-    }
-  })
-
-  // 阶段1: 如果正在计算中且已开始输入第二个操作数
-  if (isCalculating.value && hasStartedSecondOperand.value && amount.value !== '0') {
-    // 删除第二个操作数的数字
-    if (amount.value.length > 1) {
-      amount.value = amount.value.slice(0, -1);
-    } else {
-      // 如果第二个操作数只有一位，设为0并标记为未开始输入
-      amount.value = '0';
-      hasStartedSecondOperand.value = false;
-    }
-    updateDisplayExpression();
-    return;
-  }
-
-  // 阶段2: 如果正在计算中且第二个操作数已被删除为0或还没开始输入第二个操作数
-  if (isCalculating.value) {
-    // 删除运算符，回到第一个操作数
-    amount.value = previousAmount.value; // 恢复显示第一个操作数
-    currentOperation.value = '';
-    isCalculating.value = false;
-    waitingForSecondOperand.value = false;
-    displayExpression.value = '';
-    return;
-  }
-
-  // 阶段3: 删除第一个操作数
-  if (amount.value.length > 1) {
-    // 逐位删除第一个操作数
-    amount.value = amount.value.slice(0, -1);
-  } else if (amount.value !== '0') {
-    // 如果只剩一位非零数字，删除后设为0
-    amount.value = '0';
-  }
-}
-
-/**
- * 处理删除键长按开始
- * 启动计时器，如果长按超过500ms则清空所有数字
- */
-const handleDeleteLongPress = () => {
-  // 清除之前的计时器
-  if (deleteTimer.value !== null) {
-    clearTimeout(deleteTimer.value);
-  }
-
-  // 设置长按标志
-  isLongPressing.value = false;
-
-  // 启动新的计时器
-  deleteTimer.value = setTimeout(() => {
-    isLongPressing.value = true;
-    // 长按超过500ms，清空所有数字
-    clearAllNumbers();
-
-    // 触发震动反馈
-    uni.vibrateLong({
-      success: () => {
-      }
-    })
-  }, 500) as unknown as number; // 类型转换以解决setTimeout返回类型问题
-}
-
-/**
- * 处理删除键长按结束
- * 清除计时器
- */
-const handleDeleteLongPressEnd = () => {
-  if (deleteTimer.value !== null) {
-    clearTimeout(deleteTimer.value);
-    deleteTimer.value = null;
-  }
-
-  // 如果不是长按，则执行普通的删除操作
-  if (!isLongPressing.value) {
-    handleDelete();
-  }
-
-  // 重置长按标志
-  isLongPressing.value = false;
-}
-
-/**
- * 重置所有状态
- */
-const resetAllState = () => {
-  amount.value = '0';
-  currentOperation.value = '';
-  operationHistory.value = [];
-  previousAmount.value = '0';
-  displayExpression.value = '';
-  waitingForSecondOperand.value = false;
-  hasStartedSecondOperand.value = false;
-  isCalculating.value = false;
-  remark.value = '';
-}
+const amount = ref('0');
+const displayExpression = ref('');
 
 /**
  * 切换备注输入框的显示状态
  */
 const toggleRemarkInput = () => {
   showRemarkInput.value = !showRemarkInput.value;
+  if (showRemarkInput.value) {
+    // 在显示输入框后，下一帧让输入框获取焦点
+    nextTick(() => {
+      const inputEl = document.querySelector('.remark-input') as HTMLInputElement;
+      if (inputEl) inputEl.focus();
+    });
+  }
 }
 
 /**
@@ -448,20 +169,16 @@ const confirmRemark = () => {
  * 记录一笔并重置状态
  */
 const handleRecordAgain = () => {
-  resetAllState();
+  amount.value = '0';
+  displayExpression.value = '';
+  remark.value = '';
 };
 
 /**
  * 处理完成或等于按钮
- * 如果正在计算中则执行计算，否则完成记账
+ * 完成记账
  */
 const handleComplete = async () => {
-  // 如果正在计算中，执行计算
-  if (isCalculating.value) {
-    calculateResult();
-    return;
-  }
-
   if (!selectedCategory.value.id) {
     showToast('请选择类别！');
     return;
@@ -489,28 +206,13 @@ const handleComplete = async () => {
 
 // ====================== 触摸相关事件处理 ======================
 
-/**
- * 触摸开始事件处理
- * @param e 触摸事件对象
- */
-const handleTouchStart = (e: any) => {
+// 使用节流优化触摸事件
+const handleTouchStart = _.throttle((e: any) => {
   touchStartX.value = e.touches[0].clientX;
-};
+}, 50);
 
-/**
- * 触摸移动事件处理
- * @param e 触摸事件对象
- */
-const handleTouchMove = (_: any) => {
-  // 可以添加一些视觉反馈，如果需要的话
-};
-
-/**
- * 触摸结束事件处理
- * 实现左右滑动切换分类页面
- * @param e 触摸事件对象
- */
-const handleTouchEnd = (e: any) => {
+// 使用节流优化触摸结束事件
+const handleTouchEnd = _.throttle((e: any) => {
   const touchEndX = e.changedTouches[0].clientX;
   const diffX = touchEndX - touchStartX.value;
 
@@ -524,7 +226,7 @@ const handleTouchEnd = (e: any) => {
       currentPage.value++;
     }
   }
-};
+}, 50);
 
 // ====================== 生命周期钩子 ======================
 onBeforeMount(() => menuBtnRect.value = uni.getMenuButtonBoundingClientRect())
@@ -585,148 +287,137 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
     showToast('添加子分类失败，请重试');
   }
 }
+
+// 计算器数据更新回调
+const onCalculatorUpdate = (data: { amount: string, expression: string }) => {
+  amount.value = data.amount;
+  displayExpression.value = data.expression;
+};
 </script>
 
 <template>
   <!-- 顶部导航栏 -->
-  <div class="menu-button menu-toggle"
+  <view class="menu-button menu-toggle"
        :class="toggle ? 'toggle-on' : 'toggle-off'"
        :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height+15}px;`">
-    <div class="flex-center">
-      <div style="position: absolute;left: 10px" @click="backPage()">
+    <view class="flex-center">
+      <view style="position: absolute;left: 10px" @tap="backPage()">
         <u-icon name="arrow-left" size="22" color="#000"></u-icon>
-      </div>
-      <div class="flex-align-center gap-5">
-        <div class="font-bold font-xl color-000">记一笔</div>
+      </view>
+      <view class="flex-align-center gap-5">
+        <view class="font-bold font-xl color-000">记一笔</view>
         <!-- 分页指示器 -->
-        <div class="pagination" v-if="allCategories.length > 9">
-          <div v-for="(_, index) in categoryPages"
+        <view class="pagination" v-if="allCategories.length > 9">
+          <view v-for="(_, index) in categoryPages"
                :key="index"
                :class="['indicator', currentPage === index ? 'active' : '']"
-               @click="currentPage = index">
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
+               @tap="currentPage = index">
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
 
-  <div class="home-page">
+  <view class="home-page">
     <!-- 顶部金额显示卡片 -->
-    <div class="home-banner"
+    <view class="home-banner"
          style="padding: 0 12px"
          :style="`--mgt: ${menuBtnRect.height + menuBtnRect.top}px`">
-    </div>
+    </view>
 
     <!-- 分类选择区域 - 翻页效果 -->
-    <div class="categories-container">
+    <view class="categories-container">
       <!-- 分类页面容器 -->
-      <div class="categories-pages"
+      <view class="categories-pages"
            ref="pagesContainer"
            @touchstart="handleTouchStart"
-           @touchmove="handleTouchMove"
            @touchend="handleTouchEnd">
-        <div v-for="(page, pageIndex) in categoryPages"
+        <view v-for="(page, pageIndex) in categoryPages"
              :key="pageIndex"
              class="categories-page"
              :style="{ transform: `translateX(${(pageIndex - currentPage) * 100}%)` }">
 
           <!-- 第一行分类 - 最多显示5个 -->
-          <div class="categories-row">
-            <div v-for="category in page.slice(0, Math.min(5, page.length))"
+          <view class="categories-row">
+            <view v-for="category in page.slice(0, Math.min(5, page.length))"
                  :key="category.id"
-                 @click="handleSelectedCategory(category)"
+                 @tap="handleSelectedCategory(category)"
                  class="category-item">
-              <div class="icon-wrapper"
-                   :class="[
-                     selectedCategory.id === category.id ||
-                     selectedCategory.parentCategory?.id === category.id ?
-                     'active' : ''
-                   ]">
+              <view class="icon-wrapper"
+                   :class="{ active: selectedCategory.id === category.id || selectedCategory.parentCategory?.id === category.id }">
                 <up-icon v-if="category.id===114514" name="plus" color="#5E5C5D" size="28"></up-icon>
-                <span v-else class="category-icon">{{ category.icon }}</span>
-              </div>
-              <span class="category-name"
-                    :class="[
-                      selectedCategory.id === category.id ||
-                      selectedCategory.parentCategory?.id === category.id ?
-                      'active' : ''
-                    ]">
+                <text v-else class="category-icon">{{ category.icon }}</text>
+              </view>
+              <text class="category-name"
+                    :class="{ active: selectedCategory.id === category.id || selectedCategory.parentCategory?.id === category.id }">
                 {{ category.name }}
-              </span>
-            </div>
-          </div>
+              </text>
+            </view>
+          </view>
 
           <!-- 第二行分类 - 只有当有超过5个元素时才显示 -->
-          <div class="categories-row" v-if="page.length > 5">
-            <div v-for="category in page.slice(5)"
+          <view class="categories-row" v-if="page.length > 5">
+            <view v-for="category in page.slice(5)"
                  :key="category.id"
-                 @click="handleSelectedCategory(category)"
+                 @tap="handleSelectedCategory(category)"
                  class="category-item">
-              <div class="icon-wrapper"
-                   :class="[
-                     selectedCategory.id === category.id ||
-                     selectedCategory.parentCategory?.id === category.id ?
-                     'active' : ''
-                   ]">
+              <view class="icon-wrapper"
+                   :class="{ active: selectedCategory.id === category.id || selectedCategory.parentCategory?.id === category.id }">
                 <up-icon v-if="category.id===114514" name="plus" color="#5E5C5D" size="28"></up-icon>
-                <span v-else class="category-icon">{{ category.icon }}</span>
-              </div>
-              <div class="category-name"
-                   :class="[
-                     selectedCategory.id === category.id ||
-                     selectedCategory.parentCategory?.id === category.id ?
-                     'active' : ''
-                   ]">
+                <text v-else class="category-icon">{{ category.icon }}</text>
+              </view>
+              <view class="category-name"
+                   :class="{ active: selectedCategory.id === category.id || selectedCategory.parentCategory?.id === category.id }">
                 {{ category.name }}
-              </div>
-            </div>
+              </view>
+            </view>
             <!-- 如果第二行不足5个，添加空白占位元素以保持布局 -->
-            <div v-for="i in 5 - (page.length - 5)"
+            <view v-for="i in 5 - (page.length - 5)"
                  :key="`empty-${i}`"
                  class="category-item-empty">
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
+            </view>
+          </view>
+        </view>
+      </view>
+    </view>
 
     <!-- 占位空间，确保内容不被键盘遮挡 -->
-    <div class="keyboard-spacer"></div>
-  </div>
+    <view class="keyboard-spacer"></view>
+  </view>
 
   <!-- 数字键盘区域 - 固定在底部 -->
-  <div class="keypad-container">
+  <view class="keypad-container">
     <!-- 收支统计 -->
-    <div class="summary-cards card-container">
+    <view class="summary-cards card-container">
       <!-- 类别卡片 -->
-      <div class="summary-card expense">
-        <div class="card-header">
-          <div class="card-icon">
-            <span class="emoji">{{ selectedCategory.icon || '🤖' }}</span>
-          </div>
-          <div class="card-title">
+      <view class="summary-card expense">
+        <view class="card-header">
+          <view class="card-icon">
+            <text class="emoji">{{ selectedCategory.icon || '🤖' }}</text>
+          </view>
+          <view class="card-title">
             <template v-if="selectedCategory.parentCategory">
-              <span>{{ selectedCategory.parentCategory.name }}</span>
-              <span class="category-separator"> - </span>
+              <text>{{ selectedCategory.parentCategory.name }}</text>
+              <text class="category-separator"> - </text>
             </template>
-            <span class="parent-category">{{ selectedCategory.name || '未选择' }}</span>
-          </div>
-        </div>
-        <div class="card-amount">¥{{ displayAmount }}</div>
-      </div>
+            <text class="parent-category">{{ selectedCategory.name || '未选择' }}</text>
+          </view>
+        </view>
+        <view class="card-amount">¥{{ displayExpression || amount }}</view>
+      </view>
 
       <!-- 备注卡片 -->
-      <div class="summary-card income" @click="toggleRemarkInput">
-        <div class="card-header">
-          <div class="card-icon">
-            <span class="emoji">📝</span>
-          </div>
-          <div class="card-title">备注</div>
-        </div>
-        <div class="card-amount remark-text" v-if="!showRemarkInput">
+      <view class="summary-card income" @tap="toggleRemarkInput">
+        <view class="card-header">
+          <view class="card-icon">
+            <text class="emoji">📝</text>
+          </view>
+          <view class="card-title">备注</view>
+        </view>
+        <view class="card-amount remark-text" v-if="!showRemarkInput">
           {{ remark || '点击添加备注' }}
-        </div>
-        <div class="remark-input-container" v-else>
+        </view>
+        <view class="remark-input-container" v-else>
           <input type="text"
                  class="remark-input"
                  v-model="remark"
@@ -736,54 +427,19 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
                  @confirm="confirmRemark"
                  focus
                  cursor-spacing="20"/>
-        </div>
-      </div>
-    </div>
+        </view>
+      </view>
+    </view>
 
-    <div>
-
-    </div>
-
-    <!-- 键盘区域 -->
-    <div class="keypad">
-      <!-- 数字键盘 -->
-      <div class="number-pad">
-        <div v-for="num in ['7','8','9','4','5','6','1','2','3','.','0','x']"
-             :key="num"
-             class="key-btn"
-             @click="num !== 'x' ? handleNumberClick(num) : null"
-             :class="{ 'delete-btn': num === 'x' }">
-          <template v-if="num === 'x'">
-            <div class="key flex-center"
-                 @touchstart="handleDeleteLongPress"
-                 @touchend="handleDeleteLongPressEnd"
-                 @touchcancel="handleDeleteLongPressEnd">
-              <up-icon name="backspace" color="000" size="30"></up-icon>
-            </div>
-          </template>
-          <template v-else>
-            {{ num }}
-          </template>
-        </div>
-      </div>
-
-      <!-- 操作键盘 -->
-      <div class="operation-pad">
-        <div class="key-btn date-btn" @click="showDatePicker = true">
-          {{ formattedDate }}
-        </div>
-        <div class="key-btn op-btn" @click="handleMinus">-</div>
-        <div class="key-btn op-btn" @click="handlePlus">+</div>
-        <div class="key-btn op-btn" @click="calculateResult">=</div>
-      </div>
-    </div>
-
-    <!-- 底部按钮 -->
-    <div class="bottom-buttons">
-      <div class="action-btn secondary flex-center" @click="handleRecordAgain">再记</div>
-      <div class="action-btn primary flex-center" @click="handleComplete">记一笔</div>
-    </div>
-  </div>
+    <!-- 计算器键盘组件 -->
+    <CalculatorKeypad 
+      :formattedDate="formattedDate"
+      @showDatePicker="showDatePicker = true"
+      @update="onCalculatorUpdate"
+      @completeAction="handleComplete"
+      @recordAgain="handleRecordAgain"
+    />
+  </view>
 
   <!-- 日期选择器组件 -->
   <DatePicker :show="showDatePicker"
@@ -793,37 +449,37 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
 
   <!-- 子分类选择弹窗 -->
   <u-popup :show="showSubCategoryPicker" mode="bottom" @close="closeSubCategoryPicker" :round="20" :safe-area-inset-bottom="true" :custom-style="{height: 'auto'}">
-    <div class="sub-category-picker" style="padding-top: 40px;">
-      <div class="sub-category-header">
-        <div class="sub-category-title">选择子分类</div>
-        <div class="sub-category-close" @click="closeSubCategoryPicker">
+    <view class="sub-category-picker" style="padding-top: 40px;">
+      <view class="sub-category-header">
+        <view class="sub-category-title">选择子分类</view>
+        <view class="sub-category-close" @tap="closeSubCategoryPicker">
           <u-icon name="close" size="20" color="#666"></u-icon>
-        </div>
-      </div>
-      <div class="sub-category-content">
-        <div v-if="currentParentCategory" class="parent-category-info">
-          <span class="parent-category-icon">{{ currentParentCategory.icon }}</span>
-          <span class="parent-category-name">{{ currentParentCategory.name }}</span>
-        </div>
-        <div class="sub-category-grid">
-          <div v-for="subCategory in currentParentCategory?.children"
+        </view>
+      </view>
+      <view class="sub-category-content">
+        <view v-if="currentParentCategory" class="parent-category-info">
+          <text class="parent-category-icon">{{ currentParentCategory.icon }}</text>
+          <text class="parent-category-name">{{ currentParentCategory.name }}</text>
+        </view>
+        <view class="sub-category-grid">
+          <view v-for="subCategory in currentParentCategory?.children"
                :key="subCategory.id"
                class="sub-category-item"
-               @click="handleSubCategorySelect(subCategory)">
-            <div class="sub-category-icon">{{ subCategory.icon }}</div>
-            <div class="sub-category-name">{{ subCategory.name }}</div>
-          </div>
+               @tap="handleSubCategorySelect(subCategory)">
+            <view class="sub-category-icon">{{ subCategory.icon }}</view>
+            <view class="sub-category-name">{{ subCategory.name }}</view>
+          </view>
 
           <!-- 添加子分类按钮 -->
-          <div class="sub-category-item add-subcategory" @click="handleAddSubcategory">
-            <div class="sub-category-icon">
+          <view class="sub-category-item add-subcategory" @tap="handleAddSubcategory">
+            <view class="sub-category-icon">
               <u-icon name="plus" size="24" color="#183C3A"></u-icon>
-            </div>
-            <div class="sub-category-name">添加</div>
-          </div>
-        </div>
-      </div>
-    </div>
+            </view>
+            <view class="sub-category-name">添加</view>
+          </view>
+        </view>
+      </view>
+    </view>
   </u-popup>
 
   <!-- 子分类编辑器 -->
@@ -865,10 +521,56 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
 }
 
 /* ====================== 顶部导航与分页 ====================== */
-.toggle input {
-  opacity: 0;
-  width: 0;
-  height: 0;
+.menu-button {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  padding-top: var(--pdt);
+  height: var(--height);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #fff;
+  transition: all 0.3s;
+}
+
+.toggle-on {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+}
+
+.toggle-off {
+  box-shadow: none;
+}
+
+.flex-center {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  position: relative;
+}
+
+.flex-align-center {
+  display: flex;
+  align-items: center;
+}
+
+.gap-5 {
+  gap: 5px;
+}
+
+.font-bold {
+  font-weight: bold;
+}
+
+.font-xl {
+  font-size: 18px;
+}
+
+.color-000 {
+  color: #000;
 }
 
 /* 分页指示器样式 */
@@ -883,7 +585,6 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
   border-radius: 50%;
   background-color: #d1d5db;
   margin: 0 4px;
-  cursor: pointer;
 }
 
 .indicator.active {
@@ -896,6 +597,7 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
   position: relative;
   width: calc(100% - 24px); /* 让它比父容器小 12px */
   padding: 0 12px;
+  margin-top: calc(var(--height) + 10px);
 }
 
 /* 分类页面容器 */
@@ -927,7 +629,6 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
   padding: 3px;
   border-radius: 8px;
   color: #E5E5E5;
-  cursor: pointer;
   width: 16%; /* 略小于20%，以便有一点间距 */
   -webkit-tap-highlight-color: transparent; /* 移除默认的蓝色高亮 */
 }
@@ -1050,7 +751,6 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
 /* 为备注卡片添加点击效果 */
 .summary-card.income {
   position: relative;
-  cursor: pointer;
   transition: background-color 0.2s;
 }
 
@@ -1069,165 +769,10 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
   left: 0;
   right: 0;
   z-index: 100;
-  padding: 12px 12px env(safe-area-inset-bottom) 12px;
-  min-height: 750rpx; /* 添加最小高度 */
+  padding: 12px 12px calc(12px + env(safe-area-inset-bottom)) 12px;
 }
 
-.keypad {
-  display: flex;
-  background-color: #FFFFFF;
-  gap: 12px;
-}
-
-/* 数字键盘区域 */
-.number-pad {
-  flex: 3;
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-}
-
-/* 操作键盘区域 */
-.operation-pad {
-  flex: 1;
-  display: grid;
-  grid-template-rows: repeat(4, 1fr);
-  gap: 12px;
-}
-
-/* 键盘按钮基础样式 */
-.key-btn {
-  background-color: rgba(244, 244, 244, .9);
-  border: none;
-  border-radius: 8px;
-  height: 48px;
-  font-size: 20px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: background-color 0.2s;
-  position: relative;
-  overflow: hidden;
-  -webkit-tap-highlight-color: transparent; /* 移除默认的蓝色高亮 */
-}
-
-.key-btn:active {
-  background-color: #f0f0f0; /* 更改为淡灰色 */
-}
-
-/* 添加自定义点击效果 */
-.key-btn::after {
-  content: '';
-  display: block;
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  pointer-events: none;
-  background-image: radial-gradient(circle, #dedede 10%, transparent 10.01%);
-  background-repeat: no-repeat;
-  background-position: 50%;
-  transform: scale(10, 10);
-  opacity: 0;
-  transition: transform .3s, opacity .5s;
-  border-radius: 8px; /* 保持与按钮相同的圆角 */
-}
-
-.key-btn:active::after {
-  transform: scale(0, 0);
-  opacity: .3;
-  transition: 0s;
-}
-
-/* 日期按钮样式 */
-.date-btn {
-  font-size: 14px;
-  background-color: #DCE2EE;
-  color: #000;
-  font-weight: 500;
-}
-
-.date-btn:active {
-  background-color: #d0e8e7; /* 稍微深一点的淡绿色 */
-}
-
-/* 运算符按钮样式 */
-.op-btn {
-  background-color: #DBE4E1;
-  color: #000000;
-}
-
-.op-btn:active {
-  background-color: #d3e5f0; /* 稍微深一点的淡蓝色 */
-}
-
-/* 添加删除键长按效果 */
-.delete-btn:active {
-  background-color: #f0d0d0; /* 轻微红色背景表示删除操作 */
-}
-
-/* ====================== 底部按钮 ====================== */
-.bottom-buttons {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 12px;
-  background-color: #fff;
-}
-
-.action-btn {
-  padding: 12px;
-  border: none;
-  border-radius: 12px;
-  font-size: 16px;
-  margin-top: 15px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.action-btn::after {
-  content: '';
-  display: block;
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  top: 0;
-  left: 0;
-  pointer-events: none;
-  background-image: radial-gradient(circle, rgba(255, 255, 255, 0.3) 10%, transparent 10.01%);
-  background-repeat: no-repeat;
-  background-position: 50%;
-  transform: scale(10, 10);
-  opacity: 0;
-  transition: transform .3s, opacity .5s;
-  border-radius: 24px;
-}
-
-.action-btn:active::after {
-  transform: scale(0, 0);
-  opacity: .5;
-  transition: 0s;
-}
-
-.action-btn.primary {
-  background-color: #C3EAE5;
-  color: #183C3A;
-}
-
-.action-btn.primary:active {
-  background-color: #C3EAE5;
-}
-
-.action-btn.secondary {
-  background-color: #C3EAE5;
-  color: #183C3A;
-}
-
-/* 子分类选择弹窗样式 */
+/* ====================== 子分类选择弹窗样式 ====================== */
 .sub-category-picker {
   background-color: #fff;
   border-radius: 20px 20px 0 0;
@@ -1294,7 +839,6 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
   padding: 10px;
   background-color: #f5f5f5;
   border-radius: 8px;
-  cursor: pointer;
   transition: background-color 0.2s;
 }
 
