@@ -1,61 +1,110 @@
 <script setup lang="ts">
-import {onBeforeMount, onMounted, ref, reactive} from 'vue'
-import {onPageScroll} from "@dcloudio/uni-app";
+import {onMounted, ref, reactive, computed} from 'vue'
+import {onShow} from "@dcloudio/uni-app";
 import _ from "lodash";
-import QiunDataCharts from "@/components/qiun-data-charts/qiun-data-charts.vue";
-import CardBase from "@/components/card/card-base.vue";
-import CardBill from "@/components/card/card-bill.vue";
-import {getBillRecordList, getTotalExpenseMonthly} from '@/api/home/billRecord'
+import {getBillRecordList, getTotalExpenseMonthly} from '@/api/billRecord'
 import DefaultHomePage from "@/components/defaultPage/defaultHomePage.vue";
 import {jumpPage} from "@/utils";
+import BasicLayout from "@/components/layout/basic-layout.vue";
+import MonthPicker from "@/components/monthPicker/index.vue";
 
-type menuBtnRectType = {
-  top: number;
-  height: number;
-};
+// 导入日期工具函数
+import {
+  formatDateDisplay,
+  formatCurrentMonth,
+  formatYearMonth,
+  formatMonthRange as formatMonthRangeUtil
+} from '@/utils/date';
+
+/**
+ * 数据状态和响应式变量
+ */
+// 页面滚动状态
 const toggle = ref(false)
-onPageScroll(_.debounce((options: any) => toggle.value = options.scrollTop > 200, 0))
-
-const menuBtnRect = ref<menuBtnRectType>({top: 0, height: 0})
-onBeforeMount(() => menuBtnRect.value = uni.getMenuButtonBoundingClientRect())
-
-const chartData = ref({})
-const opts = ref({
-  color: ["#0ACB79"],
-  padding: undefined,
-  title: {
-    name: "0",
-    fontSize: 20,
-    color: "#2fc25b"
-  },
-  subtitle: {
-    name: "剩余日均可消费",
-    fontSize: 12,
-    color: "#E5E5E5"
-  },
-  extra: {
-    arcbar: {
-      type: "default",
-      lineCap: 'butt',
-      width: 12,
-      backgroundColor: "#E9E9E9",
-      startAngle: 0.88,
-      endAngle: 0.12,
-      gap: 2,
-    }
-  }
-})
 
 // 账单列表数据
-const billList = ref([])
+const billList = ref<any[]>([])
 const currentDayTotal = ref(0)
-const pageParams = reactive({
-  pageNo: 1,
-  pageSize: 5
-})
 const loading = ref(false)
 const hasMore = ref(true)
 
+// 月份选择相关状态
+const showMonthPicker = ref(false)
+const selectedYear = ref(new Date().getFullYear())
+const selectedMonth = ref(new Date().getMonth() + 1)
+
+// 月度数据
+const currentMonth = ref('')
+const monthlyExpense = ref(0)
+const monthlyBudget = ref(0)
+
+// 页面请求参数
+const pageParams = reactive<any>({
+  startTime: '',
+  endTime: ''
+})
+
+/**
+ * 计算属性
+ */
+// 格式化显示月份范围
+const formatMonthRange = computed(() => {
+  return formatMonthRangeUtil(selectedYear.value, selectedMonth.value);
+})
+
+// 格式化金额显示
+const formattedMonthlyExpense = computed(() => {
+  const num = monthlyExpense.value;
+  const parts = num.toString().split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  return parts.join('.');
+})
+
+/**
+ * 方法
+ */
+// 设置月份开始和结束时间
+const setMonthTimeRange = (year: number, month: number) => {
+  // 月份开始日期
+  const startDate = new Date(year, month - 1, 1);
+  // 月份结束日期（下个月的第0天就是当前月的最后一天）
+  const endDate = new Date(year, month, 0);
+
+  // 格式化日期字符串
+  const formatDate = (date: Date) => {
+    const y = date.getFullYear();
+    const m = (date.getMonth() + 1).toString().padStart(2, '0');
+    const d = date.getDate().toString().padStart(2, '0');
+    return `${y}-${m}-${d} 00:00:00`;
+  };
+
+  pageParams.startTime = formatDate(startDate);
+  pageParams.endTime = formatDate(endDate);
+};
+
+// 打开月份选择器
+const openMonthPicker = () => {
+  showMonthPicker.value = true
+}
+
+// 处理月份选择
+const handleMonthSelect = (data: { year: number, month: number }) => {
+  selectedYear.value = data.year;
+  selectedMonth.value = data.month;
+
+  // 更新当前月份
+  currentMonth.value = formatYearMonth(data.year, data.month);
+
+  // 设置月份的时间范围
+  setMonthTimeRange(data.year, data.month);
+
+  // 重新获取数据
+  refreshData();
+}
+
+/**
+ * API请求
+ */
 // 获取账单列表
 const getBillRecords = async () => {
   if (loading.value || !hasMore.value) return
@@ -65,7 +114,6 @@ const getBillRecords = async () => {
     const res = await getBillRecordList(pageParams)
     if (res.code === 0) {
       billList.value = res.data
-      currentDayTotal.value = res.data[0].total
     }
   } catch (error) {
     console.error('获取账单列表失败：', error)
@@ -74,164 +122,296 @@ const getBillRecords = async () => {
   }
 }
 
-// 下拉刷新
-const onRefresh = async () => {
-  pageParams.pageNo = 1
-  hasMore.value = true
-  await getBillRecords()
-  uni.stopPullDownRefresh()
-}
-
-// 触底加载更多
-const onReachBottom = () => {
-  if (hasMore.value) {
-    getBillRecords()
-  }
-}
-
-const currentMonth = ref('')
-const monthlyExpense = ref(0)
-const monthlyBudget = ref(0)
-const dailyAvailable = ref(0)
-
-// 计算当月剩余天数
-const getRemainingDays = () => {
-  const today = new Date()
-  const year = today.getFullYear()
-  const month = today.getMonth()
-  // 获取当月最后一天
-  const lastDay = new Date(year, month + 1, 0).getDate()
-  // 当前日期
-  const currentDay = today.getDate()
-  // 剩余天数（包含今天）
-  return lastDay - currentDay + 1
-}
-
-// 计算日均可消费金额
-const calculateDailyAvailable = () => {
-  const remainingBudget = monthlyBudget.value - monthlyExpense.value
-  const remainingDays = getRemainingDays()
-  dailyAvailable.value = Number((remainingBudget / remainingDays).toFixed(2))
-
-  // 更新环形图数据
-  updateChartData()
-}
-
-// 更新环形图数据
-const updateChartData = () => {
-  let ratio = currentDayTotal.value / dailyAvailable.value
-  // 确保比率在0到1之间
-  ratio = 1 - Math.min(Math.max(ratio, 0), 1)
-  let budget = dailyAvailable.value - currentDayTotal.value
-  const chartRes = {
-    series: [{
-      name: "日均可消费",
-      color: "#2fc25b",
-      data: ratio
-    }]
-  }
-  chartData.value = JSON.parse(JSON.stringify(chartRes))
-  opts.value.title.name = budget.toString()
-}
-
-// 格式化当前月份
-const formatCurrentMonth = () => {
-  const date = new Date()
-  const year = date.getFullYear()
-  const month = (date.getMonth() + 1).toString().padStart(2, '0')
-  return `${year}-${month}`
-}
-
 // 获取月度支出
 const getMonthlyExpense = async () => {
   try {
-    currentMonth.value = formatCurrentMonth()
     const res = await getTotalExpenseMonthly(currentMonth.value)
     if (res.code === 0) {
       monthlyExpense.value = res?.data?.total || 0
       monthlyBudget.value = res?.data?.balance || 0
-      // 计算日均可消费
-      calculateDailyAvailable()
     }
   } catch (error) {
     console.error('获取月度支出失败：', error)
   }
 }
 
-onMounted(() => {
-  getBillRecords()
-  getMonthlyExpense()
+// 刷新所有数据
+const refreshData = () => {
+  getBillRecords();
+  getMonthlyExpense();
+}
+
+/**
+ * 生命周期钩子
+ */
+onShow(() => {
+  // 初始化当前月份
+  currentMonth.value = formatCurrentMonth();
+
+  // 设置当前月份的时间范围
+  setMonthTimeRange(selectedYear.value, selectedMonth.value);
+
+  // 获取数据
+  refreshData();
 })
 </script>
 
 <template>
-  <default-home-page>
-    <template #title>
-      <div class="flex-align-start" style="padding-left: 12px;">
-        <div class="flex-start">
-          <span class="font-lg">泽狗呀</span>
-        </div>
-      </div>
-    </template>
-    <template #banner>
-      <card-base>
-        <div class="flx-justify-between width-100 color-E5E">
-          <div class="font-xs">{{ currentMonth }}</div>
-          <div class="font-xs">
-            <up-icon name="setting" color="#fff"></up-icon>
+  <basic-layout>
+    <default-home-page :is-other-high="15" @update:toggle="toggle = $event">
+      <!-- 顶部标题栏 -->
+      <template #title>
+        <div class="flex-center" style="height: 100%">
+          <div class="calendar-icon" style="position: absolute;left: 10px" @click="openMonthPicker">
+            <u-icon name="calendar" size="25" bold color="#5E5D5B"></u-icon>
+          </div>
+          <div class="flex-align-center gap-5">
+            <div class="font-bold font-xl color-000">{{ selectedMonth }}月</div>
+            <div class="color-666 font-xs">{{ formatMonthRange }}</div>
           </div>
         </div>
-        <div class="width-100" style="border-bottom: rgba(255,255,255,.3) solid 1px"></div>
-        <div class="flx-justify-between width-100" style="height: 150px">
-          <div class="flx-align-center">
-            <div class="color-0AC font-sm">{{ monthlyExpense }}</div>
-            <div class="color-E5E font-xs">本月已消费</div>
+      </template>
+
+      <!-- 收支统计卡片 -->
+      <template #banner>
+        <div class="summary-cards card-container">
+          <!-- 支出卡片 -->
+          <div class="summary-card expense">
+            <div class="card-header">
+              <div class="card-icon">
+                <span class="emoji">💸</span>
+              </div>
+              <div class="card-title">支出</div>
+            </div>
+            <div class="card-amount">¥{{ formattedMonthlyExpense }}</div>
           </div>
-          <div style="width: 60%;height: 100%">
-            <qiun-data-charts type="arcbar" :opts="opts" :chartData="chartData"/>
-          </div>
-          <div class="flx-align-center">
-            <div class="color-0AC font-sm">{{ monthlyBudget }}</div>
-            <div class="color-E5E font-xs">剩余预算</div>
+
+          <!-- 收入卡片 -->
+          <div class="summary-card income">
+            <div class="card-header">
+              <div class="card-icon">
+                <span class="emoji">💰</span>
+              </div>
+              <div class="card-title">收入</div>
+            </div>
+            <div class="card-amount">0</div>
           </div>
         </div>
-      </card-base>
-    </template>
-    <template #content>
-      <div class="bill-list">
-        <card-bill v-for="(item, index) in billList" :key="index" :bill-data="item"></card-bill>
-        <div class="loading-text" v-if="loading">加载中...</div>
-        <div class="no-more" v-if="!hasMore && billList.length > 0">没有更多数据了</div>
-        <div class="empty" v-if="!loading && billList.length === 0">暂无记账数据</div>
-      </div>
-    </template>
-  </default-home-page>
-  <div class="float-action-button icon-add-circle" @click="jumpPage('pages/home/components/addBillRecord')"
-       v-if="!toggle"/>
+      </template>
+
+      <!-- 交易记录列表 -->
+      <template #content>
+        <div class="transactions">
+          <div v-for="(group, index) in billList"
+               :key="index"
+               class="transaction-group">
+            <!-- 日期头部 -->
+            <div class="date-header">
+              <div class="date">{{ formatDateDisplay(group.consumptionDate) }}</div>
+              <div class="daily-summary">
+                <div class="unit">支</div>
+                <span class="num">¥{{ group.total }}</span>
+              </div>
+            </div>
+
+            <!-- 交易项目列表 -->
+            <div class="transaction-items">
+              <div v-for="item in group.Data" :key="item.ID" class="transaction-item"
+                   @click="jumpPage('pages/home/detail',{id:item.ID})">
+                <div class="item-left">
+                  <div class="item-icon" :style="{ backgroundColor: item.iconBg }">
+                    <span class="emoji">{{ item.BillType.icon }}</span>
+                  </div>
+                  <div class="item-info">
+                    <div class="item-category">{{ item.BillType.name }}</div>
+                    <div class="item-time">{{ item.consumptionTime.substring(10, 16) }}</div>
+                    <div class="item-time" v-if="item.remark">{{ item.remark }}</div>
+                  </div>
+                </div>
+                <div class="item-amount font-bold" :class="{ 'expense': item.type === 'expense' }">
+                  -￥{{ item.price }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </template>
+    </default-home-page>
+  </basic-layout>
+
+  <!-- 月份选择器组件 -->
+  <month-picker
+      v-model:show="showMonthPicker"
+      :selected-year="selectedYear"
+      :selected-month="selectedMonth"
+      @select-month="handleMonthSelect"
+  />
+
+  <!-- 添加记录按钮 -->
+  <div class="float-action-button icon-add-circle flex-center gap-10"
+       @click="jumpPage('pages/home/components/addBillRecord')"
+       v-show="true"
+       :class="{'button-hidden': toggle}">
+    <img class="add-icon" src="@/static/add.png" alt="">
+    <span class="color-183">记一笔</span>
+  </div>
 </template>
 
-<style scoped lang="scss">
-.bill-list {
+<style scoped>
+.calendar-icon {
+  width: 40px;
+  height: 40px;
+  background-color: #f0f0f0;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* 收支统计卡片样式 */
+.summary-cards {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.summary-card {
+  flex: 1;
+  background-color: rgba(244, 244, 244, .9);
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.card-icon {
+  font-size: 20px;
+}
+
+.card-title {
+  font-size: 16px;
+  color: #666;
+  font-weight: 500;
+}
+
+.card-amount {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+/* 交易记录列表样式 */
+.transactions {
+  margin-top: 16px;
+}
+
+.transaction-group {
+  margin-bottom: 16px;
+}
+
+.date-header {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px 8px;
+  font-size: 14px;
+  color: #908F8D;
+  font-weight: 500;
+}
+
+.daily-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.daily-summary .unit {
+  background-color: rgba(244, 244, 244, .9);
+  padding: 2px 3px;
+  color: #474644;
+  font-size: 12px;
+  border-radius: 5px;
+}
+
+.daily-summary .num {
+  font-weight: 600;
+  color: #4A4947;
+}
+
+.transaction-items {
+  background-color: rgba(244, 244, 244, .9);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.transaction-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border-bottom: 3px solid #FFFFFF;
+}
+
+.transaction-item:last-child {
+  border-bottom: none;
+}
+
+.item-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.item-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  font-size: 20px;
+}
+
+.item-info {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+}
 
-  .loading-text {
-    text-align: center;
-    color: #999;
-    padding: 16px 0;
-  }
+.item-category {
+  color: #000000;
+  font-size: 16px;
+  font-weight: 500;
+}
 
-  .no-more {
-    text-align: center;
-    color: #999;
-    padding: 16px 0;
-  }
+.item-time {
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
 
-  .empty {
-    text-align: center;
-    color: #999;
-    padding: 32px 0;
-  }
+.item-amount {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.item-amount.expense {
+  color: #000;
+}
+
+.nav-item span {
+  font-size: 12px;
+}
+
+.emoji {
+  font-style: normal;
+}
+
+.add-icon {
+  width: 20px;
+  height: 20px;
+  background-size: 100%;
 }
 </style>
