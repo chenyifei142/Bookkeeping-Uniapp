@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import {backPage, jumpPage, showToast} from "@/utils";
 import {computed, ref, onBeforeMount, onMounted} from "vue";
-import {onPageScroll} from "@dcloudio/uni-app";
-import _, { round } from "lodash";
+import {onPageScroll, onShow} from "@dcloudio/uni-app";
+import _, {round} from "lodash";
 import {getBillTypeList, saveBillRecord} from "@/api/billRecord";
 import DatePicker from "@/components/datePicker/index.vue";
+import SubcategoryEditor from "@/components/subcategoryEditor/index.vue";
+import type {Category, Subcategory, SubcategoryFormData} from '@/pages/CategoryManagement/types';
+import {saveBillType} from '@/api/CategoryManagement';
 
 // ====================== 类型定义 ======================
 type MenuBtnRectType = {
@@ -18,6 +21,12 @@ type BillType = {
   icon: string;
   children?: BillType[];
 };
+
+// 子分类编辑器中使用的类型
+interface SubcategoryData {
+  name: string;
+  icon: string;
+}
 
 // ====================== 布局与UI相关状态 ======================
 const menuBtnRect = ref<MenuBtnRectType>({top: 0, height: 0})
@@ -66,7 +75,7 @@ const handleDateConfirm = (date: Date) => {
 // ====================== 分类相关状态与方法 ======================
 const selectedCategory = ref<Partial<BillType & { parentCategory?: BillType }>>({id: undefined, name: '', icon: ''})
 const allCategories = ref<BillType[]>([])
-const manageCategoryItem = {id: 114514, name: '管理分类', icon: 'icon'}
+const manageCategoryItem = {id: 114514, name: '管理分类', icon: 'plus'}
 
 // 获取账单分类列表
 const getTypeList = async () => {
@@ -124,6 +133,10 @@ const handleSubCategorySelect = (subCategory: BillType) => {
 const closeSubCategoryPicker = () => {
   showSubCategoryPicker.value = false;
   currentParentCategory.value = null;
+  // 如果不是在编辑子分类的状态下，才关闭子分类编辑器
+  if (!showSubcategoryEditor.value) {
+    showSubcategoryEditor.value = false;
+  }
 }
 
 // ====================== 计算器状态与方法 ======================
@@ -515,9 +528,63 @@ const handleTouchEnd = (e: any) => {
 
 // ====================== 生命周期钩子 ======================
 onBeforeMount(() => menuBtnRect.value = uni.getMenuButtonBoundingClientRect())
-onMounted(() => {
+onShow(() => {
   getTypeList()
 })
+
+// 子分类编辑器相关状态
+const showSubcategoryEditor = ref(false);
+const isEditingSubcategory = ref(false);
+const subcategoryToEdit = ref<BillType | null>(null);
+
+// 处理添加子分类
+const handleAddSubcategory = () => {
+  isEditingSubcategory.value = false;
+  subcategoryToEdit.value = null;
+  showSubcategoryEditor.value = true;
+}
+
+// 保存子分类
+const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
+  try {
+    if (!currentParentCategory.value) {
+      showToast('当前分类不存在');
+      return;
+    }
+    
+    // 调用API保存子分类
+    const response = await saveBillType({
+      icon: subcategoryData.icon,
+      name: subcategoryData.name,
+      parentId: currentParentCategory.value.id,
+      bgColor: '#f5f5f5' // 设置默认背景色
+    });
+    
+    if (response.code === 0) {
+      showToast('添加子分类成功');
+      // 关闭子分类编辑器
+      showSubcategoryEditor.value = false;
+      
+      // 重新获取分类列表以更新子分类
+      await getTypeList();
+      
+      // 重新打开子分类选择器并选择相同的父分类，以便看到新添加的子分类
+      const parentCategoryId = currentParentCategory.value.id;
+      
+      // 找到刚刚更新的父分类，重新选择显示
+      const updatedParentCategory = allCategories.value.find(category => category.id === parentCategoryId);
+      if (updatedParentCategory) {
+        currentParentCategory.value = updatedParentCategory;
+      }
+    } else {
+      showToast(response.msg || '添加子分类失败');
+    }
+    
+  } catch (error) {
+    console.error('添加子分类失败:', error);
+    showToast('添加子分类失败，请重试');
+  }
+}
 </script>
 
 <template>
@@ -575,7 +642,8 @@ onMounted(() => {
                      selectedCategory.parentCategory?.id === category.id ?
                      'active' : ''
                    ]">
-                <span class="category-icon">{{ category.icon }}</span>
+                <up-icon v-if="category.id===114514" name="plus" color="#5E5C5D" size="28"></up-icon>
+                <span v-else class="category-icon">{{ category.icon }}</span>
               </div>
               <span class="category-name"
                     :class="[
@@ -600,7 +668,8 @@ onMounted(() => {
                      selectedCategory.parentCategory?.id === category.id ?
                      'active' : ''
                    ]">
-                <span class="category-icon">{{ category.icon }}</span>
+                <up-icon v-if="category.id===114514" name="plus" color="#5E5C5D" size="28"></up-icon>
+                <span v-else class="category-icon">{{ category.icon }}</span>
               </div>
               <div class="category-name"
                    :class="[
@@ -637,10 +706,10 @@ onMounted(() => {
           </div>
           <div class="card-title">
             <template v-if="selectedCategory.parentCategory">
-              <span >{{ selectedCategory.parentCategory.name }}</span>
+              <span>{{ selectedCategory.parentCategory.name }}</span>
               <span class="category-separator"> - </span>
             </template>
-            <span class="parent-category">{{ selectedCategory.name|| '未选择' }}</span>
+            <span class="parent-category">{{ selectedCategory.name || '未选择' }}</span>
           </div>
         </div>
         <div class="card-amount">¥{{ displayAmount }}</div>
@@ -723,8 +792,8 @@ onMounted(() => {
               @confirm="handleDateConfirm"/>
 
   <!-- 子分类选择弹窗 -->
-  <u-popup :show="showSubCategoryPicker" mode="bottom" @close="closeSubCategoryPicker" :round="20">
-    <div class="sub-category-picker">
+  <u-popup :show="showSubCategoryPicker" mode="bottom" @close="closeSubCategoryPicker" :round="20" :safe-area-inset-bottom="true" :custom-style="{height: 'auto'}">
+    <div class="sub-category-picker" style="padding-top: 40px;">
       <div class="sub-category-header">
         <div class="sub-category-title">选择子分类</div>
         <div class="sub-category-close" @click="closeSubCategoryPicker">
@@ -744,10 +813,34 @@ onMounted(() => {
             <div class="sub-category-icon">{{ subCategory.icon }}</div>
             <div class="sub-category-name">{{ subCategory.name }}</div>
           </div>
+
+          <!-- 添加子分类按钮 -->
+          <div class="sub-category-item add-subcategory" @click="handleAddSubcategory">
+            <div class="sub-category-icon">
+              <u-icon name="plus" size="24" color="#183C3A"></u-icon>
+            </div>
+            <div class="sub-category-name">添加</div>
+          </div>
         </div>
       </div>
     </div>
   </u-popup>
+
+  <!-- 子分类编辑器 -->
+  <SubcategoryEditor
+    :show="showSubcategoryEditor"
+    @update:show="showSubcategoryEditor = $event"
+    :is-editing="isEditingSubcategory"
+    :category-data="{
+      id: currentParentCategory?.id || 0,
+      name: currentParentCategory?.name || '',
+      icon: currentParentCategory?.icon || '',
+      bgColor: '#f5f5f5',
+      children: []
+    }"
+    :subcategory-data="null"
+    @save="handleSaveSubcategory"
+  />
 </template>
 
 <style scoped>
@@ -1139,7 +1232,8 @@ onMounted(() => {
   background-color: #fff;
   border-radius: 20px 20px 0 0;
   padding: 20px;
-  height: 750rpx; /* 修改为与keypad-container相同的高度 */
+  height: auto;
+  max-height: 65vh;
   overflow-y: auto;
 }
 
@@ -1180,7 +1274,8 @@ onMounted(() => {
 }
 
 .sub-category-content {
-  height: calc(100% - 60px); /* 减去header的高度 */
+  height: auto;
+  max-height: calc(100% - 60px); /* 减去header的高度 */
   overflow-y: auto;
 }
 
@@ -1227,5 +1322,15 @@ onMounted(() => {
   font-size: 14px;
   color: #999;
   margin: 0 2px;
+}
+
+/* 添加子分类按钮样式 */
+.add-subcategory {
+  background-color: #e0f2f1;
+  border: 1px dashed #183C3A;
+}
+
+.add-subcategory:active {
+  background-color: #c8e6c9;
 }
 </style>

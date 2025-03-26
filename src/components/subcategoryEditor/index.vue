@@ -1,6 +1,6 @@
 <template>
-  <up-popup :show="show" @close="closePopup" mode="bottom" :round="20" :safe-area-inset-bottom="true" :closeable="true">
-    <div class="subcategory-popup">
+  <up-popup :show="show" @close="closePopup" mode="bottom" :round="20" :safe-area-inset-bottom="true" :closeable="true" :custom-style="{height: 'auto'}">
+    <div class="subcategory-popup" style="padding-top: 40px;">
       <div class="popup-header">
         <div class="popup-title">{{ isEditing ? '编辑子分类' : '自定义支出类型' }}</div>
       </div>
@@ -239,9 +239,11 @@ const handleDelete = () => {
   padding: 20px 20px 0 20px;
   background-color: #fff;
   border-radius: 20px;
-  height: 90vh;
+  height: auto;
+  max-height: 75vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .popup-header {
@@ -384,8 +386,9 @@ const handleDelete = () => {
   background-color: #f4f4f4;
   border-radius: 10px;
   flex: 1;
-  padding-bottom: 30px;
+  padding: 10px 5px 30px 5px;
   scroll-padding-bottom: 30px;
+  -webkit-overflow-scrolling: touch; /* 提高iOS滚动体验 */
 }
 
 .icon-option {
