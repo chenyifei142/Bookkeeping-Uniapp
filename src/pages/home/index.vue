@@ -171,7 +171,7 @@ onShow(() => {
           </div>
         </div>
       </template>
-      
+
       <!-- 收支统计卡片 -->
       <template #banner>
         <div class="summary-cards card-container">
@@ -185,7 +185,7 @@ onShow(() => {
             </div>
             <div class="card-amount">¥{{ formattedMonthlyExpense }}</div>
           </div>
-          
+
           <!-- 收入卡片 -->
           <div class="summary-card income">
             <div class="card-header">
@@ -198,12 +198,12 @@ onShow(() => {
           </div>
         </div>
       </template>
-      
+
       <!-- 交易记录列表 -->
       <template #content>
         <div class="transactions">
-          <div v-for="(group, index) in billList" 
-               :key="index" 
+          <div v-for="(group, index) in billList"
+               :key="index"
                class="transaction-group">
             <!-- 日期头部 -->
             <div class="date-header">
@@ -213,12 +213,11 @@ onShow(() => {
                 <span class="num">¥{{ group.total }}</span>
               </div>
             </div>
-            
+
             <!-- 交易项目列表 -->
             <div class="transaction-items">
-              <div v-for="item in group.Data" 
-                   :key="item.ID" 
-                   class="transaction-item">
+              <div v-for="item in group.Data" :key="item.ID" class="transaction-item"
+                   @click="jumpPage('pages/home/detail',{id:item.ID})">
                 <div class="item-left">
                   <div class="item-icon" :style="{ backgroundColor: item.iconBg }">
                     <span class="emoji">{{ item.BillType.icon }}</span>
@@ -226,7 +225,7 @@ onShow(() => {
                   <div class="item-info">
                     <div class="item-category">{{ item.BillType.name }}</div>
                     <div class="item-time">{{ item.consumptionTime.substring(10, 16) }}</div>
-                    <div class="item-time" v-if="item.remark">{{ item.remark}}</div>
+                    <div class="item-time" v-if="item.remark">{{ item.remark }}</div>
                   </div>
                 </div>
                 <div class="item-amount font-bold" :class="{ 'expense': item.type === 'expense' }">

@@ -20,6 +20,21 @@ export async function saveBillRecord(data) {
     return (await request.post('/billRecord/save', data))
 }
 
+// 删除记录
+export async function deleteBillRecord(data) {
+    return (await request.get('/billRecord/delete', data))
+}
+
+// 记录详情
+export async function getBillRecordDetail(data) {
+    return (await request.get('/billRecord/detail', data))
+}
+
+// 修改记录
+export async function editRecordDetail(data) {
+    return (await request.post('/billRecord/edit', data))
+}
+
 // 每年有记录的月份
 export async function getCurrentYearRecord(data) {
     return (await request.get('/statistics/currentYearRecord', data))

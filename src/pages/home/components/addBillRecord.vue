@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import {backPage, jumpPage, showToast} from "@/utils";
+import {backPage, jumpPage, showToast, getQuery} from "@/utils";
 import {computed, ref, onBeforeMount, nextTick} from "vue";
-import {onPageScroll, onShow} from "@dcloudio/uni-app";
+import {onPageScroll, onShow, onLoad} from "@dcloudio/uni-app";
 import _ from "lodash";
-import {getBillTypeList, saveBillRecord} from "@/api/billRecord";
+import {getBillTypeList, saveBillRecord, getBillRecordDetail, editRecordDetail} from "@/api/billRecord";
 import DatePicker from "@/components/datePicker/index.vue";
 import SubcategoryEditor from "@/components/subcategoryEditor/index.vue";
 import type {Category, Subcategory, SubcategoryFormData} from '@/pages/CategoryManagement/types';
@@ -40,11 +40,16 @@ const selectedDate = ref(new Date());
 const showSubCategoryPicker = ref(false);
 const currentParentCategory = ref<BillType | null>(null);
 
+// 编辑相关状态
+const isEditing = ref(false);
+const recordId = ref('');
+
 // 备注相关状态
 const remark = ref(''); // 备注内容
 const showRemarkInput = ref(false); // 是否显示备注输入框
 
 // 页面滚动监听 - 使用节流而非防抖，提高响应性
+// @ts-ignore
 onPageScroll(_.throttle((options: any) => {
   toggle.value = options.scrollTop > 200
 }, 50))
@@ -89,7 +94,7 @@ const getTypeList = async () => {
 const categoryPages = computed(() => {
   // 使用空数组和早期退出策略优化性能
   if (!allCategories.value.length) return [];
-  
+
   const pages: BillType[][] = []
   // 创建新数组，避免修改原数组
   const categories = [...allCategories.value, manageCategoryItem]
@@ -185,15 +190,27 @@ const handleComplete = async () => {
   }
 
   try {
-    const response = await saveBillRecord({
+    const recordData = {
       typeId: selectedCategory.value.id.toString(),
       price: amount.value,
       consumptionTime: formattedConsumptionDate.value,
       consumptionDate: formattedConsumptionDate.value,
       remark: remark.value,
-    });
+    };
+
+    // 判断是编辑还是新增
+    let response;
+    if (isEditing.value) {
+      response = await editRecordDetail({
+        ...recordData,
+        id: recordId.value
+      });
+    } else {
+      response = await saveBillRecord(recordData);
+    }
 
     if (response.code === 0) {
+      showToast(isEditing.value ? '编辑成功' : '添加成功');
       backPage();
     } else {
       showToast(response.msg || '保存失败');
@@ -207,11 +224,13 @@ const handleComplete = async () => {
 // ====================== 触摸相关事件处理 ======================
 
 // 使用节流优化触摸事件
+// @ts-ignore
 const handleTouchStart = _.throttle((e: any) => {
   touchStartX.value = e.touches[0].clientX;
 }, 50);
 
 // 使用节流优化触摸结束事件
+// @ts-ignore
 const handleTouchEnd = _.throttle((e: any) => {
   const touchEndX = e.changedTouches[0].clientX;
   const diffX = touchEndX - touchStartX.value;
@@ -234,6 +253,73 @@ onShow(() => {
   getTypeList()
 })
 
+// 页面加载时检查是否是编辑模式
+onLoad((option: any) => {
+  // 检查URL是否包含id参数
+  if (option.id) {
+    recordId.value = option.id;
+    isEditing.value = true;
+    loadRecordDetail(recordId.value);
+  }
+})
+
+// 获取记录详情
+const loadRecordDetail = async (id: string) => {
+  try {
+    const { data } = await getBillRecordDetail({ id });
+    if (data) {
+      // 设置金额
+      amount.value = data.price.toString();
+
+      // 设置备注
+      if (data.remark) {
+        remark.value = data.remark;
+      }
+
+      // 设置日期
+      if (data.consumptionTime) {
+        selectedDate.value = new Date(data.consumptionTime);
+      }
+
+      // 设置分类
+      if (data.BillType) {
+        // 等待分类列表加载完成
+        await getTypeList();
+
+        // 查找分类
+        const categoryId = data.typeId;
+        
+        // 先在一级分类中查找
+        let foundCategory = allCategories.value.find(cat => cat.id.toString() === categoryId.toString());
+        
+        // 如果在一级分类中找不到，则在子分类中查找
+        if (!foundCategory) {
+          for (const parentCategory of allCategories.value) {
+            if (parentCategory.children) {
+              const subCategory = parentCategory.children.find(
+                sub => sub.id.toString() === categoryId.toString()
+              );
+              if (subCategory) {
+                foundCategory = subCategory;
+                selectedCategory.value = {
+                  ...subCategory,
+                  parentCategory: parentCategory
+                };
+                break;
+              }
+            }
+          }
+        } else {
+          selectedCategory.value = foundCategory;
+        }
+      }
+    }
+  } catch (error) {
+    console.error('获取记录详情失败:', error);
+    showToast('获取记录详情失败，请重试');
+  }
+};
+
 // 子分类编辑器相关状态
 const showSubcategoryEditor = ref(false);
 const isEditingSubcategory = ref(false);
@@ -253,7 +339,7 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
       showToast('当前分类不存在');
       return;
     }
-    
+
     // 调用API保存子分类
     const response = await saveBillType({
       icon: subcategoryData.icon,
@@ -261,18 +347,18 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
       parentId: currentParentCategory.value.id,
       bgColor: '#f5f5f5' // 设置默认背景色
     });
-    
+
     if (response.code === 0) {
       showToast('添加子分类成功');
       // 关闭子分类编辑器
       showSubcategoryEditor.value = false;
-      
+
       // 重新获取分类列表以更新子分类
       await getTypeList();
-      
+
       // 重新打开子分类选择器并选择相同的父分类，以便看到新添加的子分类
       const parentCategoryId = currentParentCategory.value.id;
-      
+
       // 找到刚刚更新的父分类，重新选择显示
       const updatedParentCategory = allCategories.value.find(category => category.id === parentCategoryId);
       if (updatedParentCategory) {
@@ -281,7 +367,7 @@ const handleSaveSubcategory = async (subcategoryData: SubcategoryFormData) => {
     } else {
       showToast(response.msg || '添加子分类失败');
     }
-    
+
   } catch (error) {
     console.error('添加子分类失败:', error);
     showToast('添加子分类失败，请重试');
@@ -297,127 +383,127 @@ const onCalculatorUpdate = (data: { amount: string, expression: string }) => {
 
 <template>
   <!-- 顶部导航栏 -->
-  <view class="menu-button menu-toggle"
+  <div class="menu-button menu-toggle"
        :class="toggle ? 'toggle-on' : 'toggle-off'"
        :style="`--pdt: ${menuBtnRect.top}px;--height: ${menuBtnRect.height+15}px;`">
-    <view class="flex-center">
-      <view style="position: absolute;left: 10px" @tap="backPage()">
+    <div class="flex-center">
+      <div style="position: absolute;left: 10px" @tap="backPage()">
         <u-icon name="arrow-left" size="22" color="#000"></u-icon>
-      </view>
-      <view class="flex-align-center gap-5">
-        <view class="font-bold font-xl color-000">记一笔</view>
+      </div>
+      <div class="flex-align-center gap-5">
+        <div class="font-bold font-xl color-000">记一笔</div>
         <!-- 分页指示器 -->
-        <view class="pagination" v-if="allCategories.length > 9">
-          <view v-for="(_, index) in categoryPages"
+        <div class="pagination" v-if="allCategories.length > 9">
+          <div v-for="(_, index) in categoryPages"
                :key="index"
                :class="['indicator', currentPage === index ? 'active' : '']"
                @tap="currentPage = index">
-          </view>
-        </view>
-      </view>
-    </view>
-  </view>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
-  <view class="home-page">
+  <div class="home-page">
     <!-- 顶部金额显示卡片 -->
-    <view class="home-banner"
+    <div class="home-banner"
          style="padding: 0 12px"
          :style="`--mgt: ${menuBtnRect.height + menuBtnRect.top}px`">
-    </view>
+    </div>
 
     <!-- 分类选择区域 - 翻页效果 -->
-    <view class="categories-container">
+    <div class="categories-container">
       <!-- 分类页面容器 -->
-      <view class="categories-pages"
+      <div class="categories-pages"
            ref="pagesContainer"
            @touchstart="handleTouchStart"
            @touchend="handleTouchEnd">
-        <view v-for="(page, pageIndex) in categoryPages"
+        <div v-for="(page, pageIndex) in categoryPages"
              :key="pageIndex"
              class="categories-page"
              :style="{ transform: `translateX(${(pageIndex - currentPage) * 100}%)` }">
 
           <!-- 第一行分类 - 最多显示5个 -->
-          <view class="categories-row">
-            <view v-for="category in page.slice(0, Math.min(5, page.length))"
+          <div class="categories-row">
+            <div v-for="category in page.slice(0, Math.min(5, page.length))"
                  :key="category.id"
                  @tap="handleSelectedCategory(category)"
                  class="category-item">
-              <view class="icon-wrapper"
+              <div class="icon-wrapper"
                    :class="{ active: selectedCategory.id === category.id || selectedCategory.parentCategory?.id === category.id }">
                 <up-icon v-if="category.id===114514" name="plus" color="#5E5C5D" size="28"></up-icon>
                 <text v-else class="category-icon">{{ category.icon }}</text>
-              </view>
+              </div>
               <text class="category-name"
                     :class="{ active: selectedCategory.id === category.id || selectedCategory.parentCategory?.id === category.id }">
                 {{ category.name }}
               </text>
-            </view>
-          </view>
+            </div>
+          </div>
 
           <!-- 第二行分类 - 只有当有超过5个元素时才显示 -->
-          <view class="categories-row" v-if="page.length > 5">
-            <view v-for="category in page.slice(5)"
+          <div class="categories-row" v-if="page.length > 5">
+            <div v-for="category in page.slice(5)"
                  :key="category.id"
                  @tap="handleSelectedCategory(category)"
                  class="category-item">
-              <view class="icon-wrapper"
+              <div class="icon-wrapper"
                    :class="{ active: selectedCategory.id === category.id || selectedCategory.parentCategory?.id === category.id }">
                 <up-icon v-if="category.id===114514" name="plus" color="#5E5C5D" size="28"></up-icon>
                 <text v-else class="category-icon">{{ category.icon }}</text>
-              </view>
-              <view class="category-name"
+              </div>
+              <div class="category-name"
                    :class="{ active: selectedCategory.id === category.id || selectedCategory.parentCategory?.id === category.id }">
                 {{ category.name }}
-              </view>
-            </view>
+              </div>
+            </div>
             <!-- 如果第二行不足5个，添加空白占位元素以保持布局 -->
-            <view v-for="i in 5 - (page.length - 5)"
+            <div v-for="i in 5 - (page.length - 5)"
                  :key="`empty-${i}`"
                  class="category-item-empty">
-            </view>
-          </view>
-        </view>
-      </view>
-    </view>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 占位空间，确保内容不被键盘遮挡 -->
-    <view class="keyboard-spacer"></view>
-  </view>
+    <div class="keyboard-spacer"></div>
+  </div>
 
   <!-- 数字键盘区域 - 固定在底部 -->
-  <view class="keypad-container">
+  <div class="keypad-container">
     <!-- 收支统计 -->
-    <view class="summary-cards card-container">
+    <div class="summary-cards card-container">
       <!-- 类别卡片 -->
-      <view class="summary-card expense">
-        <view class="card-header">
-          <view class="card-icon">
+      <div class="summary-card expense">
+        <div class="card-header">
+          <div class="card-icon">
             <text class="emoji">{{ selectedCategory.icon || '🤖' }}</text>
-          </view>
-          <view class="card-title">
+          </div>
+          <div class="card-title">
             <template v-if="selectedCategory.parentCategory">
               <text>{{ selectedCategory.parentCategory.name }}</text>
               <text class="category-separator"> - </text>
             </template>
             <text class="parent-category">{{ selectedCategory.name || '未选择' }}</text>
-          </view>
-        </view>
-        <view class="card-amount">¥{{ displayExpression || amount }}</view>
-      </view>
+          </div>
+        </div>
+        <div class="card-amount">¥{{ displayExpression || amount }}</div>
+      </div>
 
       <!-- 备注卡片 -->
-      <view class="summary-card income" @tap="toggleRemarkInput">
-        <view class="card-header">
-          <view class="card-icon">
+      <div class="summary-card income" @tap="toggleRemarkInput">
+        <div class="card-header">
+          <div class="card-icon">
             <text class="emoji">📝</text>
-          </view>
-          <view class="card-title">备注</view>
-        </view>
-        <view class="card-amount remark-text" v-if="!showRemarkInput">
+          </div>
+          <div class="card-title">备注</div>
+        </div>
+        <div class="card-amount remark-text" v-if="!showRemarkInput">
           {{ remark || '点击添加备注' }}
-        </view>
-        <view class="remark-input-container" v-else>
+        </div>
+        <div class="remark-input-container" v-else>
           <input type="text"
                  class="remark-input"
                  v-model="remark"
@@ -427,19 +513,19 @@ const onCalculatorUpdate = (data: { amount: string, expression: string }) => {
                  @confirm="confirmRemark"
                  focus
                  cursor-spacing="20"/>
-        </view>
-      </view>
-    </view>
+        </div>
+      </div>
+    </div>
 
     <!-- 计算器键盘组件 -->
-    <CalculatorKeypad 
+    <CalculatorKeypad
       :formattedDate="formattedDate"
       @showDatePicker="showDatePicker = true"
       @update="onCalculatorUpdate"
       @completeAction="handleComplete"
       @recordAgain="handleRecordAgain"
     />
-  </view>
+  </div>
 
   <!-- 日期选择器组件 -->
   <DatePicker :show="showDatePicker"
@@ -449,37 +535,37 @@ const onCalculatorUpdate = (data: { amount: string, expression: string }) => {
 
   <!-- 子分类选择弹窗 -->
   <u-popup :show="showSubCategoryPicker" mode="bottom" @close="closeSubCategoryPicker" :round="20" :safe-area-inset-bottom="true" :custom-style="{height: 'auto'}">
-    <view class="sub-category-picker" style="padding-top: 40px;">
-      <view class="sub-category-header">
-        <view class="sub-category-title">选择子分类</view>
-        <view class="sub-category-close" @tap="closeSubCategoryPicker">
+    <div class="sub-category-picker" style="padding-top: 40px;">
+      <div class="sub-category-header">
+        <div class="sub-category-title">选择子分类</div>
+        <div class="sub-category-close" @tap="closeSubCategoryPicker">
           <u-icon name="close" size="20" color="#666"></u-icon>
-        </view>
-      </view>
-      <view class="sub-category-content">
-        <view v-if="currentParentCategory" class="parent-category-info">
+        </div>
+      </div>
+      <div class="sub-category-content">
+        <div v-if="currentParentCategory" class="parent-category-info">
           <text class="parent-category-icon">{{ currentParentCategory.icon }}</text>
           <text class="parent-category-name">{{ currentParentCategory.name }}</text>
-        </view>
-        <view class="sub-category-grid">
-          <view v-for="subCategory in currentParentCategory?.children"
+        </div>
+        <div class="sub-category-grid">
+          <div v-for="subCategory in currentParentCategory?.children"
                :key="subCategory.id"
                class="sub-category-item"
                @tap="handleSubCategorySelect(subCategory)">
-            <view class="sub-category-icon">{{ subCategory.icon }}</view>
-            <view class="sub-category-name">{{ subCategory.name }}</view>
-          </view>
+            <div class="sub-category-icon">{{ subCategory.icon }}</div>
+            <div class="sub-category-name">{{ subCategory.name }}</div>
+          </div>
 
           <!-- 添加子分类按钮 -->
-          <view class="sub-category-item add-subcategory" @tap="handleAddSubcategory">
-            <view class="sub-category-icon">
+          <div class="sub-category-item add-subcategory" @tap="handleAddSubcategory">
+            <div class="sub-category-icon">
               <u-icon name="plus" size="24" color="#183C3A"></u-icon>
-            </view>
-            <view class="sub-category-name">添加</view>
-          </view>
-        </view>
-      </view>
-    </view>
+            </div>
+            <div class="sub-category-name">添加</div>
+          </div>
+        </div>
+      </div>
+    </div>
   </u-popup>
 
   <!-- 子分类编辑器 -->
@@ -499,7 +585,7 @@ const onCalculatorUpdate = (data: { amount: string, expression: string }) => {
   />
 </template>
 
-<style scoped>
+<style lang="scss" scoped>
 /* 通用组件样式覆盖 */
 :deep(.card) {
   padding: 20px 15px !important;

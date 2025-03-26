@@ -1,45 +1,45 @@
 <template>
-  <view>
+  <div>
     <!-- 键盘区域 -->
-    <view class="keypad">
+    <div class="keypad">
       <!-- 数字键盘 -->
-      <view class="number-pad">
-        <view v-for="num in ['7','8','9','4','5','6','1','2','3','.','0','x']"
+      <div class="number-pad">
+        <div v-for="num in ['7','8','9','4','5','6','1','2','3','.','0','x']"
              :key="num"
              class="key-btn"
              @tap="num !== 'x' ? handleNumberClick(num) : null"
              :class="{ 'delete-btn': num === 'x' }">
           <template v-if="num === 'x'">
-            <view class="key flex-center"
+            <div class="key flex-center"
                  @touchstart="handleDeleteLongPress"
                  @touchend="handleDeleteLongPressEnd"
                  @touchcancel="handleDeleteLongPressEnd">
               <up-icon name="backspace" color="000" size="30"></up-icon>
-            </view>
+            </div>
           </template>
           <template v-else>
             {{ num }}
           </template>
-        </view>
-      </view>
+        </div>
+      </div>
 
       <!-- 操作键盘 -->
-      <view class="operation-pad">
-        <view class="key-btn date-btn" @tap="handleDateClick">
+      <div class="operation-pad">
+        <div class="key-btn date-btn" @tap="handleDateClick">
           {{ formattedDate }}
-        </view>
-        <view class="key-btn op-btn" @tap="handleMinus">-</view>
-        <view class="key-btn op-btn" @tap="handlePlus">+</view>
-        <view class="key-btn op-btn" @tap="calculateResult">=</view>
-      </view>
-    </view>
+        </div>
+        <div class="key-btn op-btn" @tap="handleMinus">-</div>
+        <div class="key-btn op-btn" @tap="handlePlus">+</div>
+        <div class="key-btn op-btn" @tap="calculateResult">=</div>
+      </div>
+    </div>
 
     <!-- 底部按钮 -->
-    <view class="bottom-buttons">
-      <view class="action-btn secondary flex-center" @tap="handleRecordAgain">再记</view>
-      <view class="action-btn primary flex-center" @tap="handleComplete">记一笔</view>
-    </view>
-  </view>
+    <div class="bottom-buttons">
+      <div class="action-btn secondary flex-center" @tap="handleRecordAgain">再记</div>
+      <div class="action-btn primary flex-center" @tap="handleComplete">记一笔</div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -139,7 +139,7 @@ const calculateResult = () => {
   isCalculating.value = false;
   waitingForSecondOperand.value = false;
   hasStartedSecondOperand.value = false;
-  
+
   updateParent();
 };
 
@@ -155,7 +155,7 @@ const clearAllNumbers = () => {
   waitingForSecondOperand.value = false;
   hasStartedSecondOperand.value = false;
   isCalculating.value = false;
-  
+
   updateParent();
 };
 
@@ -276,7 +276,7 @@ const handleDelete = () => {
     // 如果只剩一位非零数字，删除后设为0
     amount.value = '0';
   }
-  
+
   updateParent();
 };
 
@@ -334,7 +334,7 @@ const handleComplete = () => {
     calculateResult();
     return;
   }
-  
+
   // 否则触发完成记账事件
   emit('completeAction');
 };
@@ -515,4 +515,4 @@ updateParent();
   background-color: #C3EAE5;
   color: #183C3A;
 }
-</style> 
+</style>
