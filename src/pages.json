@@ -12,7 +12,15 @@
       "path": "pages/home/index",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarBackgroundColor": "#F2F2F2",
+        "navigationBarBackgroundColor": "#ffffff",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/home/detail",
+      "style": {
+        "navigationBarBackgroundColor": "#ffffff",
+        "navigationBarTitleText": "",
         "enablePullDownRefresh": false
       }
     },
@@ -20,7 +28,7 @@
       "path": "pages/home/components/addBillRecord",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarBackgroundColor": "#F2F2F2",
+        "navigationBarBackgroundColor": "#ffffff",
         "enablePullDownRefresh": false,
         "disableScroll": true
       }
@@ -46,7 +54,7 @@
       "path": "pages/statistics/index",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarBackgroundColor": "#F2F2F2",
+        "navigationBarBackgroundColor": "#ffffff",
         "enablePullDownRefresh": false
       }
     },
@@ -54,7 +62,7 @@
       "path": "pages/my/index",
       "style": {
         "navigationStyle": "custom",
-        "navigationBarBackgroundColor": "#F2F2F2",
+        "navigationBarBackgroundColor": "#ffffff",
         "enablePullDownRefresh": false
       }
     }
