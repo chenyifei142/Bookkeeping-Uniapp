@@ -19,7 +19,7 @@ const emit = defineEmits(['update:toggle'])
 const toggle = ref(false)
 const handleScroll = _.debounce((e: any) => {
   const scrollTop = e.detail.scrollTop
-  toggle.value = scrollTop > 200
+  toggle.value = scrollTop > 50
   // 向父组件传递toggle状态
   emit('update:toggle', toggle.value)
 }, 0)
