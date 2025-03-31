@@ -3,7 +3,10 @@
     <div class="page-content">
       <slot></slot>
     </div>
-    <CustomTabbar :pageIndex="currentIndex"></CustomTabbar>
+    <CustomTabbar 
+      v-model:pageIndex="currentIndex"
+      @tabChange="handleTabChange"
+    ></CustomTabbar>
   </div>
 </template>
 
@@ -13,6 +16,11 @@ import {ref, onMounted} from 'vue'
 import {onShow} from '@dcloudio/uni-app'
 
 const currentIndex = ref(0)
+
+// 处理标签切换事件
+const handleTabChange = (data: { url: string, index: number }) => {
+  currentIndex.value = data.index
+}
 
 // 根据当前页面路径设置选中的标签页
 const setCurrentIndex = () => {
@@ -32,11 +40,12 @@ const setCurrentIndex = () => {
         currentIndex.value = 2
         break
       default:
-        currentIndex.value = 0
+        // 保持当前索引不变，避免非标签页切换时重置索引
+        // 只有在明确知道当前页面是标签页时才更新索引
+        break
     }
   } catch (error) {
     console.error('设置当前索引失败:', error)
-    currentIndex.value = 0 // 默认设置为首页
   }
 }
 

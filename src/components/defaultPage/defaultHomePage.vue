@@ -51,7 +51,7 @@ onMounted(() => {
       </div>
       <slot name="content"></slot>
       <!-- 添加底部空白区域，确保内容可以完全滚动到底部 -->
-      <div class="bottom-safe-area"></div>
+<!--      <div class="bottom-safe-area"></div>-->
     </div>
   </scroll-view>
 </template>
@@ -59,7 +59,7 @@ onMounted(() => {
 <style scoped>
 .contain {
   width: 100vw;
-  height: calc(100vh - (40px + var(--safe-bottom, 0px)));
+  height: calc(99vh - (40px + var(--safe-bottom, 0px)));
   box-sizing: border-box;
   /* 修改为flex布局 */
   display: flex;

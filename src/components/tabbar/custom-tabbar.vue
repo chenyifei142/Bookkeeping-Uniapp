@@ -25,6 +25,9 @@ const props = defineProps({
   }
 })
 
+// 定义emit事件
+const emit = defineEmits(['update:pageIndex', 'tabChange'])
+
 const currentIndex = ref(props.pageIndex)
 
 // 监听pageIndex变化
@@ -57,25 +60,13 @@ const tabs = [
 // 切换标签页
 const switchTab = (url: string, index: number) => {
   if (currentIndex.value === index) return
-  
-  // 检查页面是否存在，防止跳转到不存在的页面
-  const validPages = [
-    'pages/home/index',
-    'pages/statistics/index',
-    'pages/my/index'
-  ]
-  
-  if (!validPages.includes(url)) {
-    console.error(`页面不存在: ${url}`)
-    uni.showToast({
-      title: '该功能暂未开放',
-      icon: 'none'
-    })
-    return
-  }
-  
+
+  // 先更新索引
   currentIndex.value = index
-  
+  // 通知父组件状态变化
+  emit('update:pageIndex', index)
+  emit('tabChange', { url, index })
+
   // 使用try-catch捕获可能的错误
   try {
     uni.switchTab({
