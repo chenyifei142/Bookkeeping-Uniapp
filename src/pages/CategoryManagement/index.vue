@@ -2,52 +2,53 @@
   <div class="category-container">
     <!-- 页面顶部标题与操作区 -->
     <CategoryHeader
-      @add-category="showAddCategory"
-      @toggle-sort="toggleSortMode"
-      :is-sort-mode="isSortMode"
+        @add-category="showAddCategory"
+        @toggle-sort="toggleSortMode"
+        :is-sort-mode="isSortMode"
     />
 
     <!-- 分类列表 -->
     <scroll-view scroll-y class="category-page" :show-scrollbar="false" :enhanced="true">
       <div class="category-list">
         <CategoryItem
-          v-for="(category, index) in categories"
-          :key="category.id"
-          :category="category"
-          :index="index"
-          :is-sort-mode="isSortMode"
-          :is-dragging="isDragging"
-          :current-index="currentIndex"
-          :start-y="startY"
-          :current-y="currentY"
-          @toggle="toggleCategory"
-          @add-subcategory="showAddSubcategory"
-          @edit-subcategory="editSubcategory"
-          @touch-start="handleTouchStart"
-          @touch-move="handleTouchMove"
-          @touch-end="handleTouchEnd"
+            v-for="(category, index) in categories"
+            :key="category.id"
+            :category="category"
+            :index="index"
+            :is-sort-mode="isSortMode"
+            :is-dragging="isDragging"
+            :current-index="currentIndex"
+            :start-y="startY"
+            :current-y="currentY"
+            @toggle="toggleCategory"
+            @add-subcategory="showAddSubcategory"
+            @edit-subcategory="editSubcategory"
+            @touch-start="handleTouchStart"
+            @touch-move="handleTouchMove"
+            @touch-end="handleTouchEnd"
         />
       </div>
     </scroll-view>
+    <div style="height: 30px"></div>
 
     <!-- 添加/编辑子分类弹窗 -->
     <subcategory-editor
-      :show="showModal"
-      :is-editing="isEditing"
-      :category-data="selectedCategory"
-      :subcategory-data="selectedSubcategory"
-      @update:show="showModal = $event"
-      @save="handleSaveSubcategory"
-      @delete="handleDeleteSubcategory"
+        :show="showModal"
+        :is-editing="isEditing"
+        :category-data="selectedCategory"
+        :subcategory-data="selectedSubcategory"
+        @update:show="showModal = $event"
+        @save="handleSaveSubcategory"
+        @delete="handleDeleteSubcategory"
     />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { ref, watch } from 'vue'
-import { getBillTypeList } from "@/api/billRecord"
-import { jumpPage, showToast } from "@/utils"
-import { onShow } from "@dcloudio/uni-app"
+import {ref, watch} from 'vue'
+import {getBillTypeList} from "@/api/billRecord"
+import {jumpPage, showToast} from "@/utils"
+import {onShow} from "@dcloudio/uni-app"
 import SubcategoryEditor from '@/components/subcategoryEditor/index.vue'
 import CategoryHeader from './components/CategoryHeader.vue'
 import CategoryItem from './components/CategoryItem.vue'
@@ -107,7 +108,7 @@ watch(() => showModal.value, (newVal) => {
 // 获取账单分类列表
 const getTypeList = async () => {
   try {
-    const { data } = await getBillTypeList()
+    const {data} = await getBillTypeList()
     categories.value = data || []
   } catch (error) {
     console.error('获取分类列表失败:', error)
