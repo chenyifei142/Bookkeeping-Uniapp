@@ -1,17 +1,16 @@
 <script setup lang="ts">
-import { ref, reactive, computed, watch, onMounted } from 'vue'
-import { onShow } from "@dcloudio/uni-app";
-import { getTotalExpenseMonthly } from '@/api/billRecord'
-import { totalExpenditureByCategory } from "@/api/statistics";
+import {ref, reactive, computed, watch, onMounted} from 'vue'
+import {onShow} from "@dcloudio/uni-app";
+import {getTotalExpenseMonthly} from '@/api/billRecord'
+import {totalExpenditureByCategory} from "@/api/statistics";
 import DefaultHomePage from "@/components/defaultPage/defaultHomePage.vue";
-import { jumpPage } from "@/utils";
+import {jumpPage, formatAmount, formatCurrency} from "@/utils";
 import BasicLayout from "@/components/layout/basic-layout.vue";
 import MonthPicker from "@/components/monthPicker/index.vue";
 import EChart from "@/uni_modules/e-chart/components/e-chart/e-chart.vue";
 
 // 导入日期工具函数
 import {
-  formatDateDisplay,
   formatCurrentMonth,
   formatYearMonth,
   formatMonthRange as formatMonthRangeUtil
@@ -24,6 +23,7 @@ import {
  */
 interface CategoryExpenseItem {
   category: string;
+  name: string;
   icon: string;
   price: number;
 }
@@ -150,7 +150,7 @@ const option: ChartOption = {
       label: {
         show: true,
         position: 'inside',
-        fontSize: 16,
+        fontSize: 20,
         fontWeight: 'bold',
         formatter: '{b}',
         backgroundColor: 'transparent'
@@ -203,16 +203,6 @@ const option: ChartOption = {
  */
 const formatMonthRange = computed(() => {
   return formatMonthRangeUtil(selectedYear.value, selectedMonth.value);
-});
-
-/**
- * 格式化金额显示
- */
-const formattedMonthlyExpense = computed(() => {
-  const num = monthlyExpense.value;
-  const parts = num.toString().split('.');
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return parts.join('.');
 });
 
 /**
@@ -307,53 +297,30 @@ const refreshData = () => {
  */
 const loadCategoryData = async () => {
   try {
-    const { data } = await totalExpenditureByCategory({
-      type: 'month', 
+    const {data} = await totalExpenditureByCategory({
+      type: 'month',
       time: pageParams.startTime
     });
-    
+
     if (!data || data.length === 0) {
       console.warn('未获取到分类支出数据');
+      updateChartData([]);
+      statisticsData.value = []
       return;
     }
-    
+
     // 按价格从大到小排序
     const sortedData = [...data].sort((a, b) => b.price - a.price);
     statisticsData.value = sortedData;
-    
+
     // 更新图表数据
     updateChartData(sortedData);
-    
+
     // 更新中心文本显示总金额
     updateCenterTotal();
   } catch (error) {
     console.error('获取分类支出数据失败：', error);
-    // 使用默认数据
-    setDefaultChartData();
-  }
-};
 
-/**
- * 图表相关
- */
-
-/**
- * 设置默认图表数据
- */
-const setDefaultChartData = () => {
-  option.series[0].data = [
-    {value: 14, name: '🍔', itemStyle: {color: '#4a6572'}},
-    {value: 11, name: '🏥', itemStyle: {color: '#5d7a8c'}},
-    {value: 19, name: '⚽', itemStyle: {color: '#7a9aa8'}},
-    {value: 12, name: '💴', itemStyle: {color: '#97b4c0'}},
-    {value: 8, name: '🏠', itemStyle: {color: '#b5cad3'}},
-    {value: 7, name: '🚗', itemStyle: {color: '#c8d9e0'}},
-    {value: 20, name: '📱', itemStyle: {color: '#d8e6eb'}}
-  ];
-  
-  // 执行更新
-  if (echartRef.value) {
-    echartRef.value.setOption(option);
   }
 };
 
@@ -361,23 +328,39 @@ const setDefaultChartData = () => {
  * 更新图表数据
  */
 const updateChartData = (data: CategoryExpenseItem[]) => {
-  // 设定基础 HSL 颜色
-  const baseHue = 172; // 绿色系
-  const baseSaturation = 21; // 保持饱和度
-  const minLightness = 33; // 第一名的颜色（最深）
-  const maxLightness = 75; // 最后名的颜色（最浅）
-  
-  option.series[0].data = data.map((item, index) => {
-    // 计算当前数据项的亮度，排名越靠后，颜色越浅
-    const lightness = minLightness + (index / (data.length - 1 || 1)) * (maxLightness - minLightness);
-    
-    return {
-      value: item.price,
-      name: item.icon,
-      itemStyle: {color: `hsl(${baseHue}, ${baseSaturation}%, ${lightness}%)`} // 生成 HSL 颜色
-    };
-  });
-  
+  if (data.length) {
+    // 预计算所有颜色，避免动态计算可能导致的问题
+    const colors: string[] = [];
+    const baseR = 66;
+    const baseG = 101;
+    const baseB = 97;
+    const lightR = 200;
+    const lightG = 220;
+    const lightB = 218;
+
+    // 预计算10个颜色，确保足够使用
+    const colorCount = Math.max(10, data.length);
+    for (let i = 0; i < colorCount; i++) {
+      const ratio = i / (colorCount - 1);
+      const r = Math.round(baseR + ratio * (lightR - baseR));
+      const g = Math.round(baseG + ratio * (lightG - baseG));
+      const b = Math.round(baseB + ratio * (lightB - baseB));
+      colors.push(`rgb(${r}, ${g}, ${b})`);
+    }
+
+    option.series[0].data = data.map((item, index) => {
+      return {
+        value: item.price,
+        name: item.icon,
+        itemStyle: {color: colors[index % colors.length]}
+      };
+    });
+  } else {
+    option.series[0].data = []
+    option.graphic[0].style.text = '总计';
+    option.graphic[1].style.text = formatCurrency(0);
+  }
+
   // 执行更新
   if (echartRef.value) {
     echartRef.value.setOption(option);
@@ -390,8 +373,8 @@ const updateChartData = (data: CategoryExpenseItem[]) => {
 const updateCenterTotal = () => {
   if (totalAmount.value > 0) {
     option.graphic[0].style.text = '总计';
-    option.graphic[1].style.text = `¥${totalAmount.value.toFixed(2)}`;
-    
+    option.graphic[1].style.text = formatCurrency(totalAmount.value);
+
     // 更新图表
     if (echartRef.value) {
       echartRef.value.setOption({
@@ -408,16 +391,16 @@ const initEchart = async () => {
   try {
     // 初始化图表
     const initResult = await echartRef.value.init(option);
-    
+
     // 保存图表实例
     chartInstance = initResult.echartObj;
-    
+
     // 添加点击事件监听
     if (chartInstance) {
       console.log('成功获取到图表实例并添加点击事件');
-      
+
       // 为图表添加点击事件监听
-      chartInstance.on('click', function(params: any) {
+      chartInstance.on('mousedown', function (params: any) {
         console.log('饼图点击事件触发:', params);
         handlePieClick(params);
       });
@@ -432,9 +415,9 @@ const initEchart = async () => {
  */
 const handlePieClick = (params: any) => {
   if (!params || !params.data) return;
-  
+
   console.log('处理饼图点击:', params.data);
-  
+
   updateCenterText({
     name: params.data.name,
     value: params.data.value
@@ -444,13 +427,13 @@ const handlePieClick = (params: any) => {
 /**
  * 更新中心文本
  */
-const updateCenterText = (item: {name: string, value: number}) => {
+const updateCenterText = (item: { name: string, value: number }) => {
   console.log('更新中心文本:', item);
-  
+
   // 更新中心文本
   option.graphic[0].style.text = item.name;
-  option.graphic[1].style.text = `¥${item.value}`;
-  
+  option.graphic[1].style.text = formatCurrency(item.value);
+
   // 更新图表
   if (chartInstance) {
     chartInstance.setOption({
@@ -464,29 +447,12 @@ const updateCenterText = (item: {name: string, value: number}) => {
 };
 
 /**
- * 工具方法
- */
-
-/**
  * 获取百分比
  */
 const getPercentage = (value: number, showUnit = true) => {
   if (totalAmount.value === 0) return '0%';
   const percentage = (value / totalAmount.value) * 100;
   return showUnit ? `${percentage.toFixed(1)}%` : percentage.toFixed(1);
-};
-
-/**
- * 获取屏幕宽度
- */
-const getScreenWidth = (): number => {
-  try {
-    const info = uni.getSystemInfoSync();
-    return info.windowWidth;
-  } catch (e) {
-    console.error('获取屏幕信息失败:', e);
-    return 375; // 默认值
-  }
 };
 
 // ====================== 生命周期钩子 ======================
@@ -497,13 +463,13 @@ const getScreenWidth = (): number => {
 onShow(() => {
   // 初始化当前月份
   currentMonth.value = formatCurrentMonth();
-  
+
   // 设置当前月份的时间范围
   setMonthTimeRange(selectedYear.value, selectedMonth.value);
-  
+
   // 初始化图表
   initEchart();
-  
+
   // 获取数据
   refreshData();
 });
@@ -534,7 +500,7 @@ onShow(() => {
           <div class="overview-grid">
             <div class="overview-item">
               <div class="item-label">支出</div>
-              <div class="item-value">¥{{ formattedMonthlyExpense }}</div>
+              <div class="item-value">{{ formatCurrency(monthlyExpense) }}</div>
             </div>
 
             <div class="overview-item">
@@ -544,7 +510,7 @@ onShow(() => {
 
             <div class="overview-item">
               <div class="item-label">结余</div>
-              <div class="item-value negative">-¥{{ formattedMonthlyExpense }}</div>
+              <div class="item-value negative">-{{ formatCurrency(monthlyExpense) }}</div>
             </div>
 
             <div class="overview-item">
@@ -570,27 +536,28 @@ onShow(() => {
 
           <!-- 分类详情 -->
           <div class="category-details">
-            <div class="category-item" 
-                 v-for="(item, index) in statisticsData" 
-                 :key="index"
-                 @click="updateCenterText({name: item.icon, value: item.price})">
-              <div class="category-icon" 
-                   :style="{
-                     backgroundColor: option.series[0].data[index]?.itemStyle.color
-                   }">
+            <div class="category-item"
+                 v-for="(item, index) in statisticsData"
+                 :key="index">
+              <!--                 @click="updateCenterText({name: item.icon, value: item.price})">-->
+              <div class="category-icon">
                 {{ item.icon }}
               </div>
               <div class="category-info">
-                <div class="flex-between" style="width: 100%">
-                  <div class="category-name">{{ item.name }}</div>
-                  <div class="category-percentage">{{ getPercentage(item.price) }}</div>
+                <div class="flex-between">
+                  <div class="flex-start">
+                    <div class="category-name">{{ item.name }}</div>
+                    <div class="category-percentage">{{ getPercentage(item.price) }}</div>
+                  </div>
+                  <div class="category-amount">{{ formatCurrency(item.price) }}</div>
                 </div>
-                <up-line-progress 
-                    :percentage="Number(getPercentage(item.price, false))" 
-                    activeColor="#426561">
-                </up-line-progress>
+                <div style="margin-top: 5px">
+                  <up-line-progress
+                      :percentage="Number(getPercentage(item.price, false))" :showText="false"
+                      activeColor="#426561" inactiveColor="#E8EAE9" height="8">
+                  </up-line-progress>
+                </div>
               </div>
-              <div class="category-amount">¥{{ item.price }}</div>
             </div>
           </div>
         </div>
@@ -707,33 +674,22 @@ onShow(() => {
   display: flex;
   align-items: center;
   padding: 12px 8px;
-  border-bottom: 1px solid #f0f0f0;
   cursor: pointer;
   transition: all 0.2s;
   border-radius: 8px;
-  margin-bottom: 4px;
-}
-
-.category-item:active {
-  background-color: #f1f1f1;
-  transform: scale(0.98);
-}
-
-.category-item:hover {
-  background-color: #f9f9f9;
+  margin-bottom: 10px;
+  background-color: #EFEFED;
 }
 
 .category-icon {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
+  width: 30px;
+  height: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
   font-size: 20px;
   margin-right: 12px;
   color: #fff;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .category-info {
