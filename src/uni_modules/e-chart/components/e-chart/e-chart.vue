@@ -9,11 +9,6 @@
 import * as echarts from './echarts.esm.min.js';
 // #endif
 
-// vue2使用require加载在线定制的cjs包,既能正常分包,又可减少打包体积
-// #ifndef VUE3
-const echarts = require('./echarts.min.js');
-// #endif
-
 import UniCanvas from './UniCanvas.js';
 import UniImg from './UniImg.js';
 import { getRandomId, addUnitRpx, getWindowInfo } from './util.js';
