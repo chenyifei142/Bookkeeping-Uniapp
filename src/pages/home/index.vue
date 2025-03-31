@@ -4,7 +4,7 @@ import {onShow} from "@dcloudio/uni-app";
 import _ from "lodash";
 import {getBillRecordList, getTotalExpenseMonthly} from '@/api/billRecord'
 import DefaultHomePage from "@/components/defaultPage/defaultHomePage.vue";
-import {jumpPage} from "@/utils";
+import {jumpPage, formatAmount, formatCurrency} from "@/utils";
 import BasicLayout from "@/components/layout/basic-layout.vue";
 import MonthPicker from "@/components/monthPicker/index.vue";
 
@@ -52,14 +52,6 @@ const formatMonthRange = computed(() => {
   return formatMonthRangeUtil(selectedYear.value, selectedMonth.value);
 })
 
-// 格式化金额显示
-const formattedMonthlyExpense = computed(() => {
-  const num = monthlyExpense.value;
-  const parts = num.toString().split('.');
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-  return parts.join('.');
-})
-
 /**
  * 方法
  */
@@ -79,7 +71,7 @@ const setMonthTimeRange = (year: number, month: number) => {
   };
 
   pageParams.startTime = formatDate(startDate);
-  pageParams.endTime = formatDate(endDate);
+  pageParams.endTime = formatDate(endDate).replace('00:00:00',"23:59:59");
 };
 
 // 打开月份选择器
@@ -183,7 +175,7 @@ onShow(() => {
               </div>
               <div class="card-title">支出</div>
             </div>
-            <div class="card-amount">¥{{ formattedMonthlyExpense }}</div>
+            <div class="card-amount">{{ formatCurrency(monthlyExpense) }}</div>
           </div>
 
           <!-- 收入卡片 -->
@@ -210,7 +202,7 @@ onShow(() => {
               <div class="date">{{ formatDateDisplay(group.consumptionDate) }}</div>
               <div class="daily-summary">
                 <div class="unit">支</div>
-                <span class="num">¥{{ group.total }}</span>
+                <span class="num">{{ formatCurrency(group.total) }}</span>
               </div>
             </div>
 
@@ -229,7 +221,7 @@ onShow(() => {
                   </div>
                 </div>
                 <div class="item-amount font-bold" :class="{ 'expense': item.type === 'expense' }">
-                  -￥{{ item.price }}
+                  -{{ formatCurrency(item.price) }}
                 </div>
               </div>
             </div>

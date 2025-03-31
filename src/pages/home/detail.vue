@@ -1,8 +1,22 @@
 <script setup lang="ts">
 import {ref} from 'vue'
-import {backPage, getQuery, jumpPage, showToast} from "@/utils";
+import {backPage, getQuery, jumpPage, showToast, formatCurrency} from "@/utils";
 import {deleteBillRecord, getBillRecordDetail} from "@/api/billRecord";
 import {onLoad} from "@dcloudio/uni-app";
+
+// 定义交易记录的接口
+interface TransactionRecord {
+  ID?: string | number;
+  price?: number;
+  consumptionTime?: string;
+  remark?: string;
+  BillType?: {
+    icon?: string;
+    name?: string;
+    id?: number | string;
+  };
+  [key: string]: any;  // 允许其他任意属性
+}
 
 const query = ref('')
 // 页面加载
@@ -11,7 +25,8 @@ onLoad((option) => {
   query.value = id
   getDetails(id)
 })
-const transaction = ref({})
+
+const transaction = ref<TransactionRecord>({})
 const getDetails = async (id: any) => {
   const {data: data} = await getBillRecordDetail({id})
   transaction.value = data
@@ -53,11 +68,11 @@ const editTransaction = () => {
           <div class="summary-card income">
             <div class="card-header">
               <div class="card-icon">
-                <span class="emoji">{{ transaction.BillType.icon }}</span>
+                <span class="emoji">{{ transaction.BillType?.icon }}</span>
               </div>
               <div class="card-title">类型</div>
             </div>
-            <div class="card-amount">{{ transaction.BillType.name }}</div>
+            <div class="card-amount">{{ transaction.BillType?.name }}</div>
           </div>
 
           <!-- 支出卡片 -->
@@ -68,7 +83,7 @@ const editTransaction = () => {
               </div>
               <div class="card-title">支出</div>
             </div>
-            <div class="card-amount">¥{{ transaction.price }}</div>
+            <div class="card-amount">{{ formatCurrency(transaction.price) }}</div>
           </div>
         </div>
         <div class="summary-card mgt-20 flx-justify-between">

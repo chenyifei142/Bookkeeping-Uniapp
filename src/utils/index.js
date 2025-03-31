@@ -1,4 +1,5 @@
 import {baseUrl} from '@/utils/request'
+import { formatAmount, formatCurrency } from '@/utils/format'
 
 export const jumpPage = (path, query = {}) => {
     uni.navigateTo({url: `/${path}?query=${encodeURIComponent(JSON.stringify(query))}`})
@@ -58,8 +59,12 @@ export const getFileIds = async (fileList) => {
     for (const item of fileList) fileIds.push((await uploadFile(item)).data.fileId)
     return fileIds
 }
+
 export const getFiles = async (fileList) => {
     const fileIds = []
     for (const item of fileList) fileIds.push((await uploadFile(item)).data)
     return fileIds
 }
+
+// 导出格式化工具
+export { formatAmount, formatCurrency }
