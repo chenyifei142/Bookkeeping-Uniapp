@@ -41,7 +41,8 @@
         "enablePullDownRefresh": false,
         "disableScroll": true
       }
-    },{
+    },
+    {
       "path": "pages/CategoryManagement/details",
       "style": {
         "navigationBarBackgroundColor": "#ffffff",
@@ -64,6 +65,28 @@
         "navigationStyle": "custom",
         "navigationBarBackgroundColor": "#ffffff",
         "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarBackgroundColor": "#ffffff",
+        "enablePullDownRefresh": false
+      }
+    },
+    {
+      "path": "pages/register/index",
+      "style": {
+        "navigationBarTitleText": "",
+        "navigationBarBackgroundColor": "#ffffff"
+      }
+    },
+    {
+      "path": "pages/my/edit-username",
+      "style": {
+        "navigationBarTitleText": "修改昵称",
+        "navigationBarBackgroundColor": "#ffffff"
       }
     }
   ],
