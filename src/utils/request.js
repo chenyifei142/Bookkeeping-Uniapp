@@ -2,19 +2,13 @@
 import {getToken} from './auth'
 import {jumpPage, redirectPage, showToast} from '@/utils/index'
 
-export const baseUrl = 'http://j9sapr.natappfree.cc/bookkeeping'
+export const baseUrl = 'http://43.163.7.108:18120/bookkeeping'
 // export const baseUrl = 'http://192.168.1.40:8006'
 
 const request = (options = {}) => {
     options.header = {
         'Content-Type': 'application/json',
         'x-token': getToken() ? getToken() : ''
-    }
-    if (options.type === 'POST') {
-        options.header = {
-            'Content-Type': 'application/json', // 设置Content-Type为application/json
-            'x-token': getToken() ? getToken() : ''
-        }
     }
 
     return new Promise(async (resolve, reject) => {

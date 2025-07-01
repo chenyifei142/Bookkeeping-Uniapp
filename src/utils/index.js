@@ -1,5 +1,6 @@
 import {baseUrl} from '@/utils/request'
 import { formatAmount, formatCurrency } from '@/utils/format'
+import {getToken} from './auth'
 
 export const jumpPage = (path, query = {}) => {
     uni.navigateTo({url: `/${path}?query=${encodeURIComponent(JSON.stringify(query))}`})
@@ -41,10 +42,10 @@ export const showToast = (title, mask = false, icon = 'none') => {
 export const uploadFile = (file) => new Promise((resolve, reject) => {
     uni.showLoading({mask: true})
     uni.uploadFile({
-        url: `${baseUrl}/common/file/ali-upload`,
+        url: `${baseUrl}/common/upload`,
         name: 'file',
         filePath: file,
-        header: {'Authorization': "Bearer " + uni.getStorageSync('Authorization')},
+        header: { 'x-token': getToken() ? getToken() : ''},
         success: (res) => resolve(JSON.parse(res.data)),
         fail: (res) => {
             console.log(res.errMsg,"errMsg")
